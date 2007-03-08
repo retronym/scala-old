@@ -2,3 +2,4 @@
 version.minor=3
 version.patch=3
 version.major=2
+version.suffix=-RC1
