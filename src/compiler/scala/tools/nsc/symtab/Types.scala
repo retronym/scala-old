@@ -236,7 +236,7 @@ trait Types {
      */
     def typeOfThis: Type = typeSymbol.typeOfThis
 
-    /** Map to a this type which is a subtype of this type.
+    /** Map to a singleton type which is a subtype of this type.
      */
     def narrow: Type =
       if (phase.erasedTypes) this
@@ -862,6 +862,7 @@ trait Types {
       }
       underlyingCache
     }
+/*
     override def narrow: Type = {
       if (phase.erasedTypes) this
       else {
@@ -873,6 +874,8 @@ trait Types {
         thissym.thisType
       }
     }
+*/
+    override def narrow: Type = this
 
     override def termSymbol = sym
     @deprecated override def symbol = sym
@@ -1338,8 +1341,14 @@ A type's typeSymbol should never be inspected directly.
 
     override def typeOfThis = transform(sym.typeOfThis)
 
+/*
     override def narrow =
       if (sym.isModuleClass) transform(sym.thisType) 
+      else if (sym.isAliasType) normalize.narrow      
+      else super.narrow
+*/
+    override def narrow =
+      if (sym.isModuleClass) singleType(pre, sym.sourceModule)
       else if (sym.isAliasType) normalize.narrow      
       else super.narrow
 
@@ -1628,6 +1637,15 @@ A type's typeSymbol should never be inspected directly.
     }
 
     override def kind = "ExistentialType"
+
+    def withTypeVars(op: Type => Boolean): Boolean = {
+      val tvars = quantified map (tparam => new TypeVar(tparam.tpe, new TypeConstraint))
+      val underlying1 = underlying.instantiateTypeParams(quantified, tvars)
+      op(underlying1) && {
+        solve(tvars, quantified, quantified map (x => 0), false)
+        isWithinBounds(NoPrefix, NoSymbol, quantified, tvars map (_.constr.inst))
+      }
+    }
   }
 
   /** A class containing the alternatives and type prefix of an overloaded symbol.
@@ -2257,18 +2275,20 @@ A type's typeSymbol should never be inspected directly.
           }
         case TypeRef(prefix, sym, args) if (sym.isTypeParameter) =>
           def toInstance(pre: Type, clazz: Symbol): Type =
-            if ((pre eq NoType) || (pre eq NoPrefix) || !clazz.isClass) mapOver(tp) //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
+            if ((pre eq NoType) || (pre eq NoPrefix) || !clazz.isClass) mapOver(tp) 
+            //@M! see test pos/tcpoly_return_overriding.scala why mapOver is necessary
             else {
               def throwError = 
                 throw new Error("" + tp + sym.locationString +
                                 " cannot be instantiated from " + pre.widen);
               def instParam(ps: List[Symbol], as: List[Type]): Type = 
                 if (ps.isEmpty) throwError
-                else if (sym eq ps.head)  // @M! don't just replace the whole thing, might be followed by type application
+                else if (sym eq ps.head)  
+                  // @M! don't just replace the whole thing, might be followed by type application
                   appliedType(as.head, List.mapConserve(args)(this)) // @M: was as.head   
                 else instParam(ps.tail, as.tail);
               val symclazz = sym.owner
-              if (symclazz == clazz && (pre.widen.typeSymbol isNonBottomSubClass symclazz))
+              if (symclazz == clazz && (pre.widen.typeSymbol isNonBottomSubClass symclazz)) {
                 pre.baseType(symclazz) match {
                   case TypeRef(_, basesym, baseargs) =>
                     //Console.println("instantiating " + sym + " from " + basesym + " with " + basesym.typeParams + " and " + baseargs+", pre = "+pre+", symclazz = "+symclazz);//DEBUG
@@ -2285,7 +2305,7 @@ A type's typeSymbol should never be inspected directly.
                   case _ =>
                     throwError
                 }
-              else toInstance(base(pre, clazz).prefix, clazz.owner)
+              } else toInstance(base(pre, clazz).prefix, clazz.owner)
             }
           toInstance(pre, clazz)
         case _ =>
@@ -2711,6 +2731,73 @@ A type's typeSymbol should never be inspected directly.
     ok
   }
 
+  /** Is intersection of given types populated? That is,
+   *  for all types tp1, tp2 in intersection
+   *    for all common base classes bc of tp1 and tp2
+   *      let bt1, bt2 be the base types of tp1, tp2 relative to class bc
+   *      Then:
+   *        bt1 and bt2 have the same prefix, and
+   *        any correspondiong non-variant type arguments of bt1 and bt2 are the same
+   */
+  def isPopulated(tp1: Type, tp2: Type): Boolean = {
+    def isConsistent(tp1: Type, tp2: Type): Boolean = (tp1, tp2) match {
+      case (TypeRef(pre1, sym1, args1), TypeRef(pre2, sym2, args2)) =>
+        assert(sym1 == sym2)
+        pre1 =:= pre2 &&
+        !(List.map3(args1, args2, sym1.typeParams) {
+          (arg1, arg2, tparam) => 
+            //if (tparam.variance == 0 && !(arg1 =:= arg2)) Console.println("inconsistent: "+arg1+"!="+arg2)//DEBUG
+          tparam.variance != 0 || arg1 =:= arg2
+        } contains false)
+      case (et: ExistentialType, _) =>
+        et.withTypeVars(isConsistent(_, tp2))
+      case (_, et: ExistentialType) =>
+        et.withTypeVars(isConsistent(tp1, _))
+    }    
+    if (tp1.typeSymbol.isClass && tp1.typeSymbol.hasFlag(FINAL)) 
+      tp1 <:< tp2 || isNumericValueClass(tp1.typeSymbol) && isNumericValueClass(tp2.typeSymbol)
+    else tp1.baseClasses forall (bc => 
+      tp2.closurePos(bc) < 0 || isConsistent(tp1.baseType(bc), tp2.baseType(bc)))
+  }
+
+  /** Does a pattern of type `patType' need an outer test when executed against
+   *  selector type `selType' in context defined by `currentOwner'?
+   */
+  def needsOuterTest(patType: Type, selType: Type, currentOwner: Symbol) = {
+    def createDummyClone(pre: Type): Type = {
+      val dummy = currentOwner.enclClass.newValue(NoPosition, nme.ANYNAME).setInfo(pre.widen)
+      singleType(ThisType(currentOwner.enclClass), dummy)
+    }
+    def maybeCreateDummyClone(pre: Type, sym: Symbol): Type = pre match {
+      case SingleType(pre1, sym1) =>
+        if (sym1.isModule && sym1.isStatic) {
+          NoType
+        } else if (sym1.isModule && sym.owner == sym1.moduleClass) {
+          val pre2 = maybeCreateDummyClone(pre1, sym1)
+          if (pre2 eq NoType) pre2
+          else singleType(pre2, sym1)
+        } else {
+          createDummyClone(pre)
+        }
+      case ThisType(clazz) =>
+        if (clazz.isModuleClass)
+          maybeCreateDummyClone(clazz.typeOfThis, sym)
+        else if (sym.owner == clazz && (sym.hasFlag(PRIVATE) || sym.privateWithin == clazz))
+          NoType
+        else 
+          createDummyClone(pre)
+      case _ =>
+        NoType
+    }
+    patType match {
+      case TypeRef(pre, sym, args) => 
+        val pre1 = maybeCreateDummyClone(pre, sym)
+        (pre1 ne NoType) && isPopulated(typeRef(pre1, sym, args), selType)
+      case _ =>
+        false
+    }
+  }
+
   /** Undo all changes to constraints to type variables upto `limit'
    */
   private def undoTo(limit: UndoLog) {
@@ -2722,7 +2809,7 @@ A type's typeSymbol should never be inspected directly.
     }
   }
 
-  private var sametypeRecursions: Int = 0
+  private var subsametypeRecursions: Int = 0
 
   private def isUnifiable(pre1: Type, pre2: Type) =
     (beginsWithTypeVar(pre1) || beginsWithTypeVar(pre2)) && (pre1 =:= pre2)
@@ -2734,25 +2821,25 @@ A type's typeSymbol should never be inspected directly.
   /** Do `tp1' and `tp2' denote equivalent types?
    */
   def isSameType(tp1: Type, tp2: Type): Boolean = try {
-    sametypeRecursions += 1
+    subsametypeRecursions += 1
     val lastUndoLog = undoLog
     val result = isSameType0(tp1, tp2)
     if (!result) undoTo(lastUndoLog)
     result
   } finally {
-    sametypeRecursions -= 1
-    if (sametypeRecursions == 0) undoLog = List()
+    subsametypeRecursions -= 1
+    if (subsametypeRecursions == 0) undoLog = List()
   }
 
   def isDifferentType(tp1: Type, tp2: Type): Boolean = try {
-    sametypeRecursions += 1
+    subsametypeRecursions += 1
     val lastUndoLog = undoLog
     val result = isSameType0(tp1, tp2)
     undoTo(lastUndoLog)
     !result
   } finally {
-    sametypeRecursions -= 1
-    if (sametypeRecursions == 0) undoLog = List()
+    subsametypeRecursions -= 1
+    if (subsametypeRecursions == 0) undoLog = List()
   }
     
   private def isSameType0(tp1: Type, tp2: Type): Boolean = {
@@ -2855,16 +2942,15 @@ A type's typeSymbol should never be inspected directly.
     tps1.length == tps2.length &&
     List.forall2(tps1, tps2)((tp1, tp2) => tp1 =:= tp2)
 
-  private var subtypeRecursions: Int = 0
   private var pendingSubTypes = new collection.mutable.HashSet[SubTypePair]
   private var basetypeRecursions: Int = 0
   private var pendingBaseTypes = new collection.mutable.HashSet[Type]
 
   def isSubType(tp1: Type, tp2: Type): Boolean = try {
-    subtypeRecursions += 1
+    subsametypeRecursions += 1
     val lastUndoLog = undoLog
     val result = 
-      if (subtypeRecursions >= LogPendingSubTypesThreshold) {
+      if (subsametypeRecursions >= LogPendingSubTypesThreshold) {
         val p = new SubTypePair(tp1, tp2)
         if (pendingSubTypes contains p) 
           false
@@ -2881,8 +2967,8 @@ A type's typeSymbol should never be inspected directly.
     if (!result) undoTo(lastUndoLog)
     result
   } finally {
-    subtypeRecursions -= 1
-    if (subtypeRecursions == 0) undoLog = List()
+    subsametypeRecursions -= 1
+    if (subsametypeRecursions == 0) undoLog = List()
   }
 
   /** hook for IDE */
@@ -3010,15 +3096,8 @@ A type's typeSymbol should never be inspected directly.
         } finally {
           skolemizationLevel -= 1
         }
-      case (_, ExistentialType(tparams2, res2)) =>
-        val tvars = tparams2 map (tparam => new TypeVar(tparam.tpe, new TypeConstraint))
-        val ires2 = res2.instantiateTypeParams(tparams2, tvars)
-        (tp1 <:< ires2) && {
-          //println("solve: "+tparams2)
-          solve(tvars, tparams2, tparams2 map (x => 0), false)
-          //println("check bounds: "+tparams2+" aginst "+(tvars map (_.constr.inst)))
-          isWithinBounds(NoPrefix, NoSymbol, tparams2, tvars map (_.constr.inst))
-        }
+      case (_, et: ExistentialType) =>
+        et.withTypeVars(tp1 <:< _)
       case (RefinedType(parents1, ref1), _) =>
         parents1 exists (_ <:< tp2)
       
@@ -3416,7 +3495,11 @@ A type's typeSymbol should never be inspected directly.
                   case ex: NoCommonType =>
                 }
             }
-            if (lubRefined.decls.isEmpty) lubBase else lubRefined
+            if (lubRefined.decls.isEmpty) lubBase 
+            else {
+//            println("refined lub of "+ts+"/"+narrowts+" is "+lubRefined+", baseclasses = "+(ts map (_.closure) map (_.toList)))
+              lubRefined
+            }
           }
         existentialAbstraction(tparams, lubType)
     }
