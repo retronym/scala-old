@@ -53,13 +53,16 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
 
     import global.{ definitions => defs }
 
-    var handleOuter: Tree => Tree = _
+    var handleOuter: HandleOuter = _
 
-    def initialize(selector: Tree, doCheckExhaustive: Boolean, owner: Symbol, _handleOuter:Tree=>Tree ): Unit = {
+    var localTyper: LocalTyper = _
+
+    def initialize(selector: Tree, doCheckExhaustive: Boolean, owner: Symbol, _handleOuter:Tree=>Tree, _localTyper:Tree=>Tree): Unit = {
       this.owner = owner
       this.doCheckExhaustive = doCheckExhaustive
       this.selector = selector
-      this.handleOuter = _handleOuter 
+      this.handleOuter = new HandleOuter( _handleOuter )
+      this.localTyper = new LocalTyper( _localTyper )
       if (settings_debug) {
         Console.println("****")
         Console.println("**** initalize, selector = "+selector+" selector.tpe = "+selector.tpe)
@@ -181,7 +184,7 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
         cases1 = cases1.tail
       }
 
-      implicit val rep = new RepFactory(handleOuter)
+      implicit val rep = new RepFactory()
       try {
         val irep = initRep(selector, cases, doCheckExhaustive, rep)
         val root = irep.temp.head
@@ -189,7 +192,7 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
         implicit val fail: Tree = ThrowMatchError(selector.pos, mkIdent(root))
         val vdef = typed{ValDef(root, selector)}
       
-        val mch  = typed{repToTree(irep)}
+        val mch  = typed{repToTree(irep, handleOuter, localTyper)}
         dfatree = typed{squeezedBlock(List(vdef), mch)}
         
         //DEBUG("**** finished\n"+dfatree.toString)
@@ -232,9 +235,9 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
     object resetTrav extends Traverser {
       override def traverse(x:Tree): unit = x match {
         case vd @ ValDef(_,_,_,_)=>
-          if(vd.symbol.hasFlag(symtab.Flags.SYNTHETIC))  {
+          if(vd.symbol.hasFlag(symtab.Flags.TRANS_FLAG)) {
             vd.symbol.resetFlag(symtab.Flags.TRANS_FLAG)
-            vd.symbol.resetFlag(symtab.Flags.MUTABLE)
+            //vd.symbol.resetFlag(symtab.Flags.MUTABLE)
           }
         case _ =>
           super.traverse(x)
@@ -258,13 +261,13 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
              //Console.println(fn.symbol)
              if(!xs.isEmpty) {
                assert(false)
-               return CantHandleApply // this should never happen
+               return CantHandleApply // System.exit(-1); // this should never happen
              }
              null 
           } else {
             isImplemented(xs, guard)
           }
-        case p @ Ident(n)       => null //if(guard eq EmptyTree) null else CantHandleGuard
+        case p @ Ident(n)       => if(guard eq EmptyTree) null else CantHandleGuard
 
         //case UnApply(fn,xs)     => isImplemented(xs, guard)
         case UnApply(fn,xs)     => 
@@ -272,7 +275,7 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
             // List.unapply<...>(xs)
             case Apply(TypeApply(sel @ Select(stor, nme.unapplySeq),_),_) if(stor.symbol eq definitions.ListModule) => 
               (xs: @unchecked) match {
-                case ArrayValue(_,ys)::Nil => isImplemented(ys, guard) // return {if(guard eq EmptyTree) isImplemented(ys, guard) else CantHandleGuard }
+                case ArrayValue(_,ys)::Nil => return {if(guard eq EmptyTree) isImplemented(ys, guard) else CantHandleGuard }
               }
 
             // ignore other unapplySeq occurrences, since will run into ArrayValue
@@ -283,8 +286,8 @@ trait PatternMatchers { self: transform.ExplicitOuter with PatternNodes with Par
         case Bind(n, p)         => isImplemented(p , guard)
         case Alternative(xs)    => isImplemented(xs, guard)
         case p:Literal          => null
-        case p:Select           => null // if(guard eq EmptyTree) null else CantHandleGuard
-        case p:Typed            => null // if(guard eq EmptyTree) null else CantHandleGuard
+        case p:Select           => if(guard eq EmptyTree) null else CantHandleGuard
+        case p:Typed            => if(guard eq EmptyTree) null else CantHandleGuard
 
         // ArrayValue nodes can also appear in repeated parameter positions of case classes (e.g. xml.Elem)
         case ArrayValue(_,xs)   => CantHandleSeq
@@ -944,11 +947,10 @@ print()
      */
   private def generalSwitchToTree(): Tree = {
     this.exit = owner.newLabel(root.pos, "exit").setInfo(new MethodType(List(resultType), resultType));
-    val result = owner.newVariable(root.pos, "result").setInfo( resultType );
+    val result = exit.newValueParameter(root.pos, "result").setInfo( resultType );
     squeezedBlock(
       List(
         typedValDef(root.casted, selector),
-        typedValDef(result, EmptyTree),
         typed { toTree(root.and) },
         ThrowMatchError(selector.pos,  mkIdent(root.casted))) ,
       LabelDef(exit, List(result), mkIdent(result))) 
@@ -1010,9 +1012,8 @@ print()
               Literal(Constant(true))
             ); // forward jump
         
-          if (guard(i) != EmptyTree) { // no need for handleout
-            res0 = And(guard(i), res0);
-          }
+          if (guard(i) != EmptyTree)
+            res0 = And(handleOuter(guard(i)), res0);
           res = Or(squeezedBlock(ts.toList, res0), res)
           i = i - 1
         }
@@ -1126,7 +1127,10 @@ print()
         typed { t } // //DEBUG
       } catch {
         case e => 
+
           Console.println("failed with "+e.getMessage()+" on: "+t)
+          //System.exit(-1)
+          //null
         t
       }
     }
@@ -1204,7 +1208,7 @@ print()
 
           // compare outer instance for patterns like foo1.Bar foo2.Bar if not statically known to match
           casted.tpe match {
-            case TypeRef(prefix,_,_) if needsOuterTest(casted.tpe, selector.tpe, owner) =>
+            case TypeRef(prefix,_,_) if needsOuterTest(casted.tpe, selector.tpe) =>
                 //@attention, deep typer bug: if we omit "typed" here, we crash when typing the tree that contains this fragment
                 cond = typed{ addOuterCondition(cond, casted.tpe, selector.duplicate, handleOuter) }
 
