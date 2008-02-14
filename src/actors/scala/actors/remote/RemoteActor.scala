@@ -45,6 +45,20 @@ object RemoteActor {
 
   private val kernels = new scala.collection.mutable.HashMap[Actor, NetKernel]
 
+  private var cl: ClassLoader = try {
+    ClassLoader.getSystemClassLoader()
+  } catch {
+    case sec: SecurityException =>
+      Debug.info(this+": caught "+sec)
+      null
+    case ise: IllegalStateException =>
+      Debug.info(this+": caught "+ise)
+      null
+  }
+
+  def classLoader: ClassLoader = cl
+  def classLoader_=(x: ClassLoader) { cl = x }
+
   /**
    * Makes <code>self</code> remotely accessible on TCP port
    * <code>port</code>.
@@ -54,15 +68,18 @@ object RemoteActor {
   }
 
   def createKernelOnPort(port: Int): NetKernel = {
-    val serv = TcpService(port)
+    val serv = TcpService(port, cl)
     val kern = serv.kernel
     val s = Actor.self
     kernels += Pair(s, kern)
 
     Scheduler.onTerminate(s) {
       Debug.info("alive actor "+s+" terminated")
+      // remove mapping for `s`
       kernels -= s
-      if (kernels.isEmpty) {
+      // terminate `kern` when it does
+      // not appear as value any more
+      if (!kernels.values.contains(kern)) {
         Debug.info("terminating "+kern)
         // terminate NetKernel
         kern.terminate()
@@ -79,7 +96,7 @@ object RemoteActor {
   def register(name: Symbol, a: Actor): Unit = synchronized {
     val kernel = kernels.get(Actor.self) match {
       case None =>
-        val serv = new TcpService(TcpService.generatePort)
+        val serv = new TcpService(TcpService.generatePort, cl)
         serv.start()
         kernels += Pair(Actor.self, serv.kernel)
         serv.kernel
@@ -102,8 +119,9 @@ object RemoteActor {
    * Returns (a proxy for) the actor registered under
    * <code>name</code> on <code>node</code>.
    */
-  def select(node: Node, sym: Symbol): Actor =
+  def select(node: Node, sym: Symbol): Actor = synchronized {
     selfKernel.getOrCreateProxy(node, sym)
+  }
 }
 
 

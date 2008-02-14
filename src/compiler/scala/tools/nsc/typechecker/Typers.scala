@@ -12,7 +12,7 @@ package scala.tools.nsc.typechecker
 
 import scala.collection.mutable.{HashMap, ListBuffer}
 import scala.compat.Platform.currentTime
-import scala.tools.nsc.util.{HashSet, Position, Set, NoPosition}
+import scala.tools.nsc.util.{HashSet, Position, Set, NoPosition, SourceFile}
 import symtab.Flags._
 import util.HashSet
 
@@ -38,14 +38,11 @@ trait Typers { self: Analyzer =>
 
   private val superDefs = new HashMap[Symbol, ListBuffer[Tree]]
 
-  val synthetics = new HashMap[Symbol, Tree]
-  
   def resetTyper() {
     resetContexts
     resetNamer()
     transformed.clear
     superDefs.clear
-    synthetics.clear
   }
 
   object UnTyper extends Traverser {
@@ -1548,11 +1545,11 @@ trait Typers { self: Analyzer =>
           }
 
           // add synthetics
-          synthetics get e.sym match {
-            case Some(tree) => 
+          context.unit.synthetics get e.sym match {
+            case Some(tree) =>
               newStats += tree
-              synthetics -= e.sym
-            case None =>
+              context.unit.synthetics -= e.sym
+            case _ =>
           }
 
           e = e.next
@@ -1914,16 +1911,6 @@ trait Typers { self: Analyzer =>
       }
     }
 
-    protected def existentialBound(sym: Symbol): Type = 
-      if (sym.isClass) 
-         polyType(sym.typeParams, mkTypeBounds(AllClass.tpe, sym.classBound))
-      else if (sym.isAbstractType) 
-         sym.info
-      else if (sym.isTerm) 
-         mkTypeBounds(AllClass.tpe, intersectionType(List(sym.tpe, SingletonClass.tpe)))
-      else 
-        throw new Error("unexpected alias type: "+sym)
-
     /** Given a set `rawSyms' of term- and type-symbols, and a type `tp'.
      *  produce a set of fresh type parameters and a type so that it can be 
      *  abstracted to an existential type.
@@ -1943,7 +1930,7 @@ trait Typers { self: Analyzer =>
     protected def existentialTransform(rawSyms: List[Symbol], tp: Type) = {
       val typeParams: List[Symbol] = rawSyms map { sym =>
         val name = if (sym.isType) sym.name else newTypeName(sym.name+".type")
-        val bound = existentialBound(sym)
+        val bound = sym.existentialBound
         val quantified: Symbol = 
 	  recycle(sym.owner.newAbstractType(sym.pos, name)) 
         trackSetInfo(quantified setFlag EXISTENTIAL)(bound.cloneInfo(quantified))
@@ -2016,14 +2003,14 @@ trait Typers { self: Analyzer =>
               !(localSyms contains sym) && !(boundSyms contains sym) ) {
             if (sym.typeParams.isEmpty) {
               localSyms += sym
-              addLocals(existentialBound(sym))
+              addLocals(sym.existentialBound)
             } else if (tp.typeArgs.isEmpty) {
               unit.error(tree.pos, 
                 "implementation restriction: can't existentially abstract over higher-kinded type" + tp)
             } else {
               val inst = new SymInstance(sym, tp)
               if (!(localInstances contains inst)) {
-                val bound = existentialBound(sym) match {
+                val bound = sym.existentialBound match {
                   case PolyType(tparams, restpe) => 
                     restpe.subst(tparams, tp.typeArgs)
                   case t =>
@@ -2368,12 +2355,18 @@ trait Typers { self: Analyzer =>
         case OverloadedType(pre, alts) =>
           inferPolyAlternatives(fun, args map (_.tpe))
           val tparams = fun.symbol.typeParams //@M TODO: fun.symbol.info.typeParams ? (as in typedAppliedTypeTree)
-          assert(args.length == tparams.length)  //@M: in case TypeApply we can't check the kind-arities 
-          // of the type arguments as we don't know which alternative to choose... here we do
-          val args1 = map2Conserve(args, tparams) { 
-            //@M! the polytype denotes the expected kind
-            (arg, tparam) => typedHigherKindedType(arg, polyType(tparam.typeParams, AnyClass.tpe)) 
-          }          
+          val args1 = if(args.length == tparams.length) {
+            //@M: in case TypeApply we can't check the kind-arities of the type arguments,
+            // as we don't know which alternative to choose... here we do
+            map2Conserve(args, tparams) { 
+              //@M! the polytype denotes the expected kind
+              (arg, tparam) => typedHigherKindedType(arg, polyType(tparam.typeParams, AnyClass.tpe)) 
+            }          
+          } else // @M: there's probably something wrong when args.length != tparams.length... (triggered by bug #320)
+           // Martin, I'm using fake trees, because, if you use args or arg.map(typedType), 
+           // inferPolyAlternatives loops...  -- I have no idea why :-(
+            args.map(t => errorTree(tree, "wrong number of type parameters for "+treeSymTypeMsg(fun))) 
+          
           typedTypeApply(fun, args1)
         case SingleType(_, _) =>
           typedTypeApply(fun setType fun.tpe.widen, args)

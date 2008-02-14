@@ -11,13 +11,26 @@
 package scala.actors.remote
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream,
-                ObjectInputStream, ObjectOutputStream}
+                ObjectInputStream, ObjectOutputStream, InputStream,
+                ObjectStreamClass}
+
+/**
+ *  @author Guy Oliver
+ */
+class CustomObjectInputStream(os: InputStream, cl: ClassLoader) extends ObjectInputStream(os) {
+  override def resolveClass(cd: ObjectStreamClass): Class[T] forSome { type T } =
+    try {
+      cl.loadClass(cd.getName())
+    } catch {
+      case cnf: ClassNotFoundException =>
+        super.resolveClass(cd)
+    }
+}
 
 /**
  *  @author Philipp Haller
  */
-class JavaSerializer(serv: Service) extends Serializer(serv) {
-
+class JavaSerializer(serv: Service, cl: ClassLoader) extends Serializer(serv) {
   def serialize(o: AnyRef): Array[Byte] = {
     val bos = new ByteArrayOutputStream()
     val out = new ObjectOutputStream(bos)
@@ -28,7 +41,13 @@ class JavaSerializer(serv: Service) extends Serializer(serv) {
 
   def deserialize(bytes: Array[Byte]): AnyRef = {
     val bis = new ByteArrayInputStream(bytes)
-    val in = new ObjectInputStream(bis)
+
+    // use custom stream only if cl != null
+    val in = if (cl != null)
+      new CustomObjectInputStream(bis, cl)
+    else
+      new ObjectInputStream(bis)
+
     in.readObject()
   }
 }

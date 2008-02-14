@@ -6,6 +6,7 @@
 
 package scala.tools.nsc.symtab
 
+import scala.collection.mutable.ListBuffer
 import scala.tools.nsc.io.AbstractFile
 import scala.tools.nsc.util.{Position, NoPosition, BatchSourceFile}
 import Flags._
@@ -637,17 +638,45 @@ trait Symbols {
       attributes.filter(_.atp.typeSymbol.isNonBottomSubClass(clazz))
 
     /** The least proper supertype of a class; includes all parent types
-     *  and refinement where needed */
+     *  and refinement where needed 
+     */
     def classBound: Type = {
       val tp = refinedType(info.parents, owner)
       val thistp = tp.typeSymbol.thisType
+      val oldsymbuf = new ListBuffer[Symbol]
+      val newsymbuf = new ListBuffer[Symbol]
       for (sym <- info.decls.toList) {
-        if (sym.isPublic && !sym.isClass && !sym.isConstructor)
-          addMember(thistp, tp, 
-            sym.cloneSymbol(tp.typeSymbol).setInfo(sym.info.substThis(this, thistp)))
+        // todo: what about public references to private symbols?
+        if (sym.isPublic && !sym.isConstructor) {
+          oldsymbuf += sym
+          newsymbuf += ( 
+            if (sym.isClass)
+              tp.typeSymbol.newAbstractType(sym.pos, sym.name).setInfo(sym.existentialBound)
+            else 
+              sym.cloneSymbol(tp.typeSymbol))
+        }
+      }
+      val oldsyms = oldsymbuf.toList
+      val newsyms = newsymbuf.toList
+      for (sym <- newsyms) {
+        addMember(thistp, tp, sym.setInfo(sym.info.substThis(this, thistp).substSym(oldsyms, newsyms)))
       }
       tp
     }
+
+    /** If we quantify existentially over this symbol, 
+     *  the bound of the type variable that stands for it 
+     *  pre: symbol is a term, a class, or an abstract type (no alias type allowed)
+     */
+    def existentialBound: Type = 
+      if (this.isClass) 
+         polyType(this.typeParams, mkTypeBounds(AllClass.tpe, this.classBound))
+      else if (this.isAbstractType) 
+         this.info
+      else if (this.isTerm) 
+         mkTypeBounds(AllClass.tpe, intersectionType(List(this.tpe, SingletonClass.tpe)))
+      else 
+        throw new Error("unexpected alias type: "+this)
 
     /** Reset symbol to initial state
      */
@@ -832,12 +861,27 @@ trait Symbols {
         if (isClass) this else moduleClass 
       } else owner.toplevelClass
 
+    /** Is this symbol defined in the same scope and compilation unit as `that' symbol?
+     */
+    def isCoDefinedWith(that: Symbol) = 
+      (this.rawInfo ne NoType) && {
+        val res = 
+          !this.owner.isPackageClass || 
+          (this.sourceFile eq null) ||
+          (that.sourceFile eq null) ||
+          (this.sourceFile eq that.sourceFile)
+        if (!res) {
+          println("strange linked: "+this+" "+this.locationString+";"+this.sourceFile+"/"+that+that.locationString+";"+that.sourceFile+";"+that.moduleClass.sourceFile)
+        }
+        res
+      }
+
     /** The class with the same name in the same package as this module or
      *  case class factory
      */
     final def linkedClassOfModule: Symbol = {
       if (this != NoSymbol)
-        owner.info.decl(name.toTypeName).suchThat(sym => sym.rawInfo ne NoType)
+        owner.info.decl(name.toTypeName).suchThat(_ isCoDefinedWith this)
       else NoSymbol
     }
 
@@ -847,7 +891,7 @@ trait Symbols {
     final def linkedModuleOfClass: Symbol =
       if (this.isClass && !this.isAnonymousClass && !this.isRefinementClass) {
         owner.rawInfo.decl(name.toTermName).suchThat(
-          sym => (sym hasFlag MODULE) && (sym.rawInfo ne NoType))
+          sym => (sym hasFlag MODULE) && (sym isCoDefinedWith this))
       } else NoSymbol
 
     /** For a module its linked class, for a class its linked module or case
@@ -855,7 +899,7 @@ trait Symbols {
      */
     final def linkedSym: Symbol =
       if (isTerm) linkedClassOfModule
-      else if (isClass) owner.info.decl(name.toTermName).suchThat(sym => sym.rawInfo ne NoType)
+      else if (isClass) owner.info.decl(name.toTermName).suchThat(_ isCoDefinedWith this)
       else NoSymbol
 
     /** For a module class its linked class, for a plain class
