@@ -983,9 +983,11 @@ MSIL
            failonerror="false">
       <include name="scala/Predef.scala"/>
       <include name="scala/Option.scala"/>
+      <include name="scala/Pair.scala"/>
       <include name="scala/Console.scala"/>
       <include name="scala/Application.scala"/>
       <include name="scala/ByNameFunction.scala"/>
+      <include name="scala/Stream.scala"/>
       <include name="scala/*Annotation.scala"/>
       <include name="scala/Function*.scala"/>
       <include name="scala/Tuple*.scala"/>
@@ -995,6 +997,9 @@ MSIL
       <include name="scala/native.scala"/>
       <include name="scala/serializable.scala"/>
       <include name="scala/transient.scala"/>
+      <include name="scala/volatile.scala"/>
+      <include name="scala/remote.scala"/>
+      <include name="scala/collection/mutable/HashMap.scala"/>
       <include name="scala/runtime/*.scala"/>
       <exclude name="scala/runtime/RichStringBuilder.scala"/>
     </quick>
