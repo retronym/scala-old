@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2007, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2008, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -65,11 +65,11 @@ final class RichString(val self: String) extends Proxy with RandomAccessSeq[Char
   }
 
   override def reverse: RichString = {
-    val buf = new StringBuffer
+    val buf = new StringBuilder
     var i = self.length - 1
     while (i >= 0) {
       buf append (self charAt i)
-      i = i - 1
+      i -= 1
     }
     new RichString(buf.toString)
   }
@@ -138,11 +138,14 @@ final class RichString(val self: String) extends Proxy with RandomAccessSeq[Char
     linesWithSeparators map (line => new RichString(line).stripLineEnd)
 
   /** Returns this string with first character converted to upper case */
-  def capitalize: String = {
-    val chars = self.toCharArray
-    chars(0) = chars(0).toUpperCase
-    new String(chars)
-  }
+  def capitalize: String =
+    if (self == null) null
+    else if (self.length == 0) ""
+    else {
+      val chars = self.toCharArray
+      chars(0) = chars(0).toUpperCase
+      new String(chars)
+    }
 
   /** <p>
    *    For every line in this string:
@@ -153,7 +156,7 @@ final class RichString(val self: String) extends Proxy with RandomAccessSeq[Char
    *  </blockquote>
    */
   def stripMargin(marginChar: Char): String = {
-    val buf = new StringBuilder()
+    val buf = new StringBuilder
     for (line <- linesWithSeparators) {
       val len = line.length
       var index = 0
@@ -189,12 +192,13 @@ final class RichString(val self: String) extends Proxy with RandomAccessSeq[Char
     self.split(re)
   }
 
-  def toByte: Byte     = java.lang.Byte.parseByte(self)
-  def toShort: Short   = java.lang.Short.parseShort(self)
-  def toInt: Int       = java.lang.Integer.parseInt(self)
-  def toLong: Long     = java.lang.Long.parseLong(self)
-  def toFloat: Float   = java.lang.Float.parseFloat(self)
-  def toDouble: Double = java.lang.Double.parseDouble(self)
+  def toBoolean: Boolean = parseBoolean(self)
+  def toByte: Byte       = java.lang.Byte.parseByte(self)
+  def toShort: Short     = java.lang.Short.parseShort(self)
+  def toInt: Int         = java.lang.Integer.parseInt(self)
+  def toLong: Long       = java.lang.Long.parseLong(self)
+  def toFloat: Float     = java.lang.Float.parseFloat(self)
+  def toDouble: Double   = java.lang.Double.parseDouble(self)
 }
 
 object RichString {
@@ -203,5 +207,13 @@ object RichString {
   private final val FF: Char = 0x0C
   private final val CR: Char = 0x0D
   private final val SU: Char = 0x1A
-}
 
+  private def parseBoolean(s: String): Boolean =
+    if (s != null) s.toLowerCase match {
+      case "true" => true
+      case "false" => false
+      case _ => throw new NumberFormatException("For input string: \""+s+"\"")
+    }
+    else
+      throw new NumberFormatException("For input string: \"null\"")
+}
