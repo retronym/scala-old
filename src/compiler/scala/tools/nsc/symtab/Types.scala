@@ -2504,21 +2504,13 @@ A type's typeSymbol should never be inspected directly.
    */
   object rawToExistential extends TypeMap {
     def apply(tp: Type): Type = tp match {
-      case RawType(ex) => ex
-      case _ => mapOver(tp)
-    }
-  }
-
-  /** An extractor for raw types */
-  private object RawType {
-    def unapply(t: Type): Option[Type] = t match {
       case TypeRef(pre, sym, List()) if !sym.typeParams.isEmpty && sym.hasFlag(JAVA) =>
         //  note: it's important to write the two tests in this order,
         //  as only typeParams forces the classfile to be read. See #400
         val eparams = typeParamsToExistentials(sym, sym.typeParams)
-        Some(existentialAbstraction(eparams, TypeRef(pre, sym, eparams map (_.tpe))))
+        existentialAbstraction(eparams, TypeRef(pre, sym, eparams map (_.tpe)))
       case _ =>
-        None
+        mapOver(tp)
     }
   }
 
@@ -3349,7 +3341,8 @@ A type's typeSymbol should never be inspected directly.
   }
 
   def normalizePlus(tp: Type) = tp match {
-    case RawType(ex1) => ex1
+    case TypeRef(pre, sym, List()) if (sym.isInitialized && sym.hasFlag(JAVA) && !sym.typeParams.isEmpty) =>
+      rawToExistential(tp)
     case _ => tp.normalize
   }
     
