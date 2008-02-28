@@ -2504,13 +2504,21 @@ A type's typeSymbol should never be inspected directly.
    */
   object rawToExistential extends TypeMap {
     def apply(tp: Type): Type = tp match {
+      case RawType(ex) => ex
+      case _ => mapOver(tp)
+    }
+  }
+
+  /** An extractor for raw types */
+  private object RawType {
+    def unapply(t: Type): Option[Type] = t match {
       case TypeRef(pre, sym, List()) if !sym.typeParams.isEmpty && sym.hasFlag(JAVA) =>
         //  note: it's important to write the two tests in this order,
         //  as only typeParams forces the classfile to be read. See #400
         val eparams = typeParamsToExistentials(sym, sym.typeParams)
-        existentialAbstraction(eparams, TypeRef(pre, sym, eparams map (_.tpe)))
+        Some(existentialAbstraction(eparams, TypeRef(pre, sym, eparams map (_.tpe))))
       case _ =>
-        mapOver(tp)
+        None
     }
   }
 
@@ -3339,6 +3347,11 @@ A type's typeSymbol should never be inspected directly.
     subsametypeRecursions -= 1
     if (subsametypeRecursions == 0) undoLog = List()
   }
+
+  def normalizePlus(tp: Type) = tp.normalize match {
+    case RawType(ex1) => ex1
+    case nt => nt
+  }
     
   private def isSameType0(tp1: Type, tp2: Type): Boolean = {
     (tp1, tp2) match {
@@ -3433,8 +3446,8 @@ A type's typeSymbol should never be inspected directly.
         false
     }
   } || {
-    val tp1n = tp1.normalize
-    val tp2n = tp2.normalize
+      val tp1n = normalizePlus(tp1)
+      val tp2n = normalizePlus(tp2)
     ((tp1n ne tp1) || (tp2n ne tp2)) && isSameType(tp1n, tp2n)
   }
 
@@ -3628,8 +3641,8 @@ A type's typeSymbol should never be inspected directly.
       case _ =>
         false
     }) || {
-    val tp1n = tp1.normalize
-    val tp2n = tp2.normalize
+    val tp1n = normalizePlus(tp1)
+    val tp2n = normalizePlus(tp2)
     ((tp1n ne tp1) || (tp2n ne tp2)) && isSubType0(tp1n, tp2n)
     }
   }
@@ -4189,6 +4202,8 @@ A type's typeSymbol should never be inspected directly.
       } catch {
         case ex: MalformedType => None
       }
+    case ExistentialType(tparams, quantified) :: rest =>
+      mergePrefixAndArgs(quantified :: rest, variance, depth) map (existentialAbstraction(tparams, _))
     case _ =>
       assert(false, tps); None
   }
