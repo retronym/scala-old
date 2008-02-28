@@ -3348,9 +3348,9 @@ A type's typeSymbol should never be inspected directly.
     if (subsametypeRecursions == 0) undoLog = List()
   }
 
-  def normalizePlus(tp: Type) = tp.normalize match {
+  def normalizePlus(tp: Type) = tp match {
     case RawType(ex1) => ex1
-    case nt => nt
+    case _ => tp.normalize
   }
     
   private def isSameType0(tp1: Type, tp2: Type): Boolean = {
