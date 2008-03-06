@@ -3339,6 +3339,12 @@ A type's typeSymbol should never be inspected directly.
     subsametypeRecursions -= 1
     if (subsametypeRecursions == 0) undoLog = List()
   }
+
+  def normalizePlus(tp: Type) = tp match {
+    case TypeRef(pre, sym, List()) if (sym.isInitialized && sym.hasFlag(JAVA) && !sym.typeParams.isEmpty) =>
+      rawToExistential(tp)
+    case _ => tp.normalize
+  }
     
   private def isSameType0(tp1: Type, tp2: Type): Boolean = {
     (tp1, tp2) match {
@@ -3433,8 +3439,8 @@ A type's typeSymbol should never be inspected directly.
         false
     }
   } || {
-    val tp1n = tp1.normalize
-    val tp2n = tp2.normalize
+      val tp1n = normalizePlus(tp1)
+      val tp2n = normalizePlus(tp2)
     ((tp1n ne tp1) || (tp2n ne tp2)) && isSameType(tp1n, tp2n)
   }
 
@@ -3628,8 +3634,8 @@ A type's typeSymbol should never be inspected directly.
       case _ =>
         false
     }) || {
-    val tp1n = tp1.normalize
-    val tp2n = tp2.normalize
+    val tp1n = normalizePlus(tp1)
+    val tp2n = normalizePlus(tp2)
     ((tp1n ne tp1) || (tp2n ne tp2)) && isSubType0(tp1n, tp2n)
     }
   }
@@ -4189,6 +4195,8 @@ A type's typeSymbol should never be inspected directly.
       } catch {
         case ex: MalformedType => None
       }
+    case ExistentialType(tparams, quantified) :: rest =>
+      mergePrefixAndArgs(quantified :: rest, variance, depth) map (existentialAbstraction(tparams, _))
     case _ =>
       assert(false, tps); None
   }

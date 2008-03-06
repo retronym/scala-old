@@ -125,15 +125,6 @@ abstract class BoxedArray extends Array.Array0[Any] {
   /** Returns an array that contains all indices of this array */
   def indices: Array[Int] = Array.range(0, length)
 
-  override def takeWhile(p: Any => Boolean) = {
-    val c = length + 1
-    take((findIndexOf(!p(_)) + c) % c)
-  }
-  override def dropWhile(p: Any => Boolean) = {
-    val c = length + 1
-    drop((findIndexOf(!p(_)) + c) % c)
-  }
-
   final def deepToString() = deepMkString(stringPrefix + "(", ",", ")")
 
   final def deepMkString(start: String, sep: String, end: String): String = {
