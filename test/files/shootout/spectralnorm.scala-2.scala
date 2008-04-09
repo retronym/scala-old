@@ -3,7 +3,7 @@
    contributed by Isaac Gouy 
 */
 
-object spectralnorm {
+object SpectralNorm {
 
    def main(args: Array[String]) = {
       val n = Integer parseInt(args(0))
