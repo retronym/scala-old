@@ -303,7 +303,7 @@ abstract class ClassfileParser {
           case CONSTANT_DOUBLE =>
             Constant(in.getDouble(start + 1))
           case CONSTANT_CLASS =>
-            getClassSymbol(index)
+            getClassOrArrayType(index).typeSymbol
           case _ =>
             errorBadTag(start)
         }
@@ -336,9 +336,9 @@ abstract class ClassfileParser {
     
     innerClasses.get(name) match {
       case Some(entry) =>
-//        println("found inner class " + name)
+        //println("found inner class " + name)
         val res = innerClasses.classSymbol(entry.externalName)
-//        println("\trouted to: " + res)
+        //println("\trouted to: " + res)
         res
       case None =>
         //if (name.toString.contains("$")) println("No inner class: " + name + innerClasses + " while parsing " + in.file.name)
@@ -354,7 +354,7 @@ abstract class ClassfileParser {
     var sflags = transFlags(jflags, true)
     var nameIdx = in.nextChar
     externalName = pool.getClassName(nameIdx)
-    val c = pool.getClassSymbol(nameIdx)
+    val c = if (externalName.toString.indexOf('$') < 0) pool.getClassSymbol(nameIdx) else clazz
     if (c != clazz && externalName.toString.indexOf("$") < 0) {
       if ((clazz eq NoSymbol) && (c ne NoSymbol)) { // XXX: needed for build compiler, so can't protect with inIDE
         clazz = c
@@ -377,7 +377,8 @@ abstract class ClassfileParser {
     val classInfo = ClassInfoType(parents, instanceDefs, clazz)
     val staticInfo = ClassInfoType(List(), staticDefs, statics)
 
-    enterOwnInnerClasses
+    if (!isScala && !isScalaRaw)
+      enterOwnInnerClasses
     val curbp = in.bp
     skipMembers() // fields
     skipMembers() // methods
@@ -832,7 +833,12 @@ abstract class ClassfileParser {
    *  and implicitly current class' superclasses.
    */
   private def enterOwnInnerClasses {
-    def enterClassAndModule(name: Name, completer: global.loaders.SymbolLoader, jflags: Int): Symbol = {
+    def className(name: Name): Name = {
+      name.subName(name.lastPos('.') + 1, name.length)
+    }
+    
+    def enterClassAndModule(entry: InnerClassEntry, completer: global.loaders.SymbolLoader, jflags: Int) {
+      val name = entry.originalName
       var sflags = transFlags(jflags, true)
 
       val innerClass = getOwner(jflags).newClass(NoPosition, name.toTypeName).setInfo(completer).setFlag(sflags)
@@ -841,6 +847,22 @@ abstract class ClassfileParser {
 	
       getScope(jflags).enter(innerClass)
       getScope(jflags).enter(innerModule)
+      
+      // the 1.4 library misses entries in the InnerClasses attributes (see HashMap$Entry in LinkedHashMap)
+      // TODO: remove this test when we drop support for 1.4
+      if (settings.target.value != "jvm-1.4") {
+        val decls = innerClass.enclosingPackage.info.decls
+        val e = decls.lookupEntry(className(entry.externalName))
+        if (e ne null) {
+          //println("removing " + e)
+          decls.unlink(e)
+        }
+        val e1 = decls.lookupEntry(className(entry.externalName).toTypeName)
+        if (e1 ne null) {
+          //println("removing " + e1)
+          decls.unlink(e1)
+        }
+      }
     }
     
     for (entry <- innerClasses.values) {
@@ -849,7 +871,7 @@ abstract class ClassfileParser {
         val file = global.classPath.lookupPath(
           entry.externalName.replace('.', java.io.File.separatorChar).toString, false)
         assert(file ne null, entry.externalName)
-        enterClassAndModule(entry.originalName, new global.loaders.ClassfileLoader(file, null, null), entry.jflags)
+        enterClassAndModule(entry, new global.loaders.ClassfileLoader(file, null, null), entry.jflags)
       }
     }
   }
@@ -880,7 +902,8 @@ abstract class ClassfileParser {
         case nme.ScalaATTR =>
           isScalaRaw = true
         case nme.InnerClassesATTR if !isScala =>
-          for (i <- 0 until in.nextChar) {
+          val entries = in.nextChar.toInt
+          for (i <- 0 until entries) {
             val innerIndex = in.nextChar
             val outerIndex = in.nextChar
             val nameIndex = in.nextChar
@@ -888,7 +911,7 @@ abstract class ClassfileParser {
             if (innerIndex != 0 && outerIndex != 0 && nameIndex != 0) {
               val entry = InnerClassEntry(innerIndex, outerIndex, nameIndex, jflags)
               innerClasses += (pool.getClassName(innerIndex) -> entry)
-            }	
+            }
           }
         case _ =>
           in.skip(attrLen)
