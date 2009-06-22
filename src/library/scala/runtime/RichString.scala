@@ -244,5 +244,66 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
    */
   def format(l: java.util.Locale, args: Any*): String =
     java.lang.String.format(l, self, args.asInstanceOf[Seq[AnyRef]].toArray: _*)
-}
+    
+  /** <p>
+   *  Like Java's <a href="" target="contentFrame" class="java/lang/String">
+   *  <code>String</code></a> <code>matches</code>, but accepting matches anywhere
+   *  in the string, as implemented by Java's 
+   *  <a href="" target="contentFrame" class="java/util/Regex">
+   *  <code>Regex</code></a> <code>find</code>.
+   *  </p>
+   *
+   *  @param regex a string with the regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def findRegex(regex: String): Boolean = findRegex(regex.r)
+    
+  /** <p>
+   *  Like Java's <a href="" target="contentFrame" class="java/lang/String">
+   *  <code>String</code></a> <code>matches</code>, but accepting matches anywhere
+   *  in the string, as implemented by Java's 
+   *  <a href="" target="contentFrame" class="java/util/Regex">
+   *  <code>Regex</code></a> <code>find</code>.
+   *  </p>
+   *
+   *  @param regex a regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def findRegex(regex: Regex): Boolean = regex.findFirstIn(self) != None
+    
+  /** <p>
+   *  Comparision operator for <code>findRegex</code>.
+   *  </p>
+   *
+   *  @param regex a string with the regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def =~(regex: String): Boolean = findRegex(regex)
+  
+  /** <p>
+   *  Comparision operator for <code>findRegex</code>.
+   *  </p>
+   *
+   *  @param regex a regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def =~(regex: Regex): Boolean = findRegex(regex)
+  
+  /** <p>
+   *  Comparision operator for the negation of <code>findRegex</code>.
+   *  </p>
+   *
+   *  @param regex a string with the regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def !~(regex: String): Boolean = !findRegex(regex)
 
+  /** <p>
+   *  Comparision operator for the negation of <code>findRegex</code>.
+   *  </p>
+   *
+   *  @param regex a regular expression to match against
+   *  @throws java.util.Regex.PatternSyntaxException If the expression's syntax is invalid
+   */
+  def !~(regex: Regex): Boolean = !findRegex(regex)
+}
