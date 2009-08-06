@@ -110,6 +110,7 @@ PROPERTIES
   <property name="lib-ant.dir" value="${lib.dir}/ant"/>
   <property name="src.dir" value="${basedir}/src"/>
   <property name="test.dir" value="${basedir}/test"/>
+  <property name="runcoderun.dir" value="${basedir}/runcoderun"/>
 
   <!-- Loads custom properties definitions -->
   <property file="${basedir}/build.properties"/>
@@ -122,7 +123,8 @@ PROPERTIES
   <property name="lib.starr.jar" value="${lib.dir}/scala-library.jar"/>
   <property name="comp.starr.jar" value="${lib.dir}/scala-compiler.jar"/>
   <property name="jline.jar" value="${lib.dir}/jline.jar"/>
-  <property name="ant.jar" value="${ant.home}/lib/ant.jar"/>
+  <!-- <property name="ant.jar" value="${ant.home}/lib/ant.jar"/> -->
+  <property name="ant.jar" value="${runcoderun.dir}/ant.jar"/>
 
   <!-- Sets location of build folders -->
   <property name="build.dir" value="${basedir}/build"/>
