@@ -6,9 +6,9 @@ task :test do
   classpath = [
     File.join(".", "runcoderun", "ant.jar"),
     File.join(".", "runcoderun", "ant-launcher.jar"),
-    File.join(".", "runcoderun", "ant-nodeps.jar"),
-    File.join(".", "runcoderun", "tools.jar"),
-    File.join(".", "lib", "scala-library.jar")
+    File.join(".", "runcoderun", "ant-nodeps.jar")
+    # File.join(".", "runcoderun", "tools.jar"),
+    # File.join(".", "lib", "scala-library.jar")
   ].join(File::PATH_SEPARATOR)
   exec "java -cp #{classpath} org.apache.tools.ant.Main -emacs test"
 end
