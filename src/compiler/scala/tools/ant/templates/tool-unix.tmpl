@@ -1,5 +1,5 @@
 #!/bin/sh
-
+#
 ##############################################################################
 # Copyright 2002-2009, LAMP/EPFL
 #
@@ -63,8 +63,32 @@ fi
 # Reminder: substitution ${JAVA_OPTS:=-Xmx256M -Xms16M} DO NOT work on Solaris
 [ -n "$JAVA_OPTS" ] || JAVA_OPTS="@javaflags@"
 
+# Iterate over command line arguments looking for -D and -J args,
+# both of which we pass to the underlying JVM instead of to scala.
+# (In the case of -J we strip the -J first.)
+# Example usage: scala -J-Xmx1024M -Dfoo.bar=123
+#
+while [ $# -ne 0 ]
+do
+  param=$1;
+  case "$param" in
+    -J*)
+      val=${param:2}
+      JAVA_OPTS="$JAVA_OPTS $val" ;;
+    -D*)
+      JAVA_OPTS="$JAVA_OPTS $param" ;;
+    *)
+      if [ -z "$SCALA_ARGS" ]; then
+        SCALA_ARGS=("$param")
+      else
+        SCALA_ARGS=("${SCALA_ARGS[@@]}" "$param")
+      fi
+  esac
+  shift;
+done
+
 if [ -z "$JAVACMD" -a -n "$JAVA_HOME" -a -x "$JAVA_HOME/bin/java" ]; then
     JAVACMD="$JAVA_HOME/bin/java"
 fi
 
-exec "${JAVACMD:=java}" $JAVA_OPTS -cp "$TOOL_CLASSPATH" -Dscala.home="$SCALA_HOME" -Denv.classpath="$CLASSPATH" -Denv.emacs="$EMACS" @properties@ @class@ @toolflags@ "$@@"
+exec "${JAVACMD:=java}" $JAVA_OPTS -cp "$TOOL_CLASSPATH" -Dscala.home="$SCALA_HOME" -Denv.classpath="$CLASSPATH" -Denv.emacs="$EMACS" @properties@ @class@ @toolflags@ "${SCALA_ARGS[@@]}"
