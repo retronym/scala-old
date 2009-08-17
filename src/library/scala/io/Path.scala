@@ -32,6 +32,9 @@ import util.Random.nextASCIIString
  *  @since   2.8
  */
 
+// See http://download.java.net/jdk7/docs/api/java/nio/file/Path.html
+// for some ideas.
+
 object Path
 {
   // not certain these won't be problematic, but looks good so far

@@ -77,12 +77,10 @@ with Streamable.Chars
     new BufferedWriter(writer(append, codec))
   
   /** Writes all the Strings in the given iterator to the file. */
-  def writeAll(xs: Traversable[String], append: Boolean = false, codec: Codec = getCodec()): Unit = {
-    val out = bufferedWriter(append, codec)
-    try xs foreach (out write _)
-    finally out close
-  }
-  
+  def writeAll(xs: Traversable[String], append: Boolean = false): Unit =
+    for (w <- arm.ManagedResource(bufferedWriter(append)))
+      xs foreach (w write _)
+
   def copyFile(destPath: Path, preserveFileDate: Boolean = false) = {
     val FIFTY_MB = 1024 * 1024 * 50
     val dest = destPath.toFile
