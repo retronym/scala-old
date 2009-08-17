@@ -57,8 +57,8 @@ object Source {
    */
   def fromString(s: String): Source = fromIterable(s)
 
-  /** Create a <code>Source</code> from array of bytes, with
-   *  empty description.
+  /** Create a <code>Source</code> from array of bytes, decoding
+   *  the bytes according to codec.
    *
    *  @param bytes ...
    *  @param enc   ...
@@ -66,6 +66,11 @@ object Source {
    */
   def fromBytes(bytes: Array[Byte])(implicit codec: Codec = Codec.default): Source =
     fromString(new String(bytes, codec.name))
+  
+  /** Create a <code>Source</code> from array of bytes, assuming
+   *  one byte per character (ISO-8859-1 encoding.)
+   */
+  def fromRawBytes(bytes: Array[Byte]): Source = fromString(new String(bytes, Codec.ISO8859.name))
 
   /** creates Source from file with given name, setting
    *  its description to filename.
@@ -75,6 +80,11 @@ object Source {
   /** creates <code>Source</code> from file with given file: URI
    */
   def fromURI(uri: URI)(implicit codec: Codec = Codec.default): Source = fromFile(new JFile(uri))
+  
+  /** same as fromInputStream(url.openStream())(codec)
+   */
+  def fromURL(url: URL)(implicit codec: Codec = Codec.default): Source =
+    fromInputStream(url.openStream())(codec)
 
   /** Creates Source from <code>file</code>, using given character encoding,
    *  setting its description to filename. Input is buffered in a buffer of
@@ -83,7 +93,7 @@ object Source {
   def fromFile(file: JFile, bufferSize: Int = DefaultBufSize)(implicit codec: Codec = Codec.default): Source = {
     val inputStream = new FileInputStream(file)
 
-    BufferedSource.fromInputStream(
+    fromInputStream(
       inputStream,
       bufferSize,
       () => fromFile(file, bufferSize)(codec),
@@ -91,22 +101,37 @@ object Source {
     ) withDescription ("file:" + file.getAbsolutePath)
   }
 
-  /** same as fromInputStream(url.openStream(), enc) 
+  /** Reads data from <code>inputStream</code> with a buffered reader,
+   *  using encoding in implicit parameter <code>codec</code>.
+   * 
+   *  @param  inputStream  the input stream from which to read
+   *  @param  bufferSize   buffer size (defaults to Source.DefaultBufSize)
+   *  @param  reset        a () => Source which resets the stream (if unset, reset() will throw an Exception)
+   *  @param  codec        (implicit) a scala.io.Codec specifying behavior (defaults to Codec.default)
+   *  @return              the buffered source
    */
-  def fromURL(url: URL)(implicit codec: Codec = Codec.default): Source =
-    fromInputStream(url.openStream())
-
-  /** same as BufferedSource.fromInputStream(is)
-   */
-  def fromInputStream(inputStream: InputStream)(implicit codec: Codec = Codec.default): Source = 
-    BufferedSource.fromInputStream(
-      inputStream,
-      DefaultBufSize,
-      () => fromInputStream(inputStream)(codec),
-      () => inputStream.close()
-    )
+  def fromInputStream(
+    inputStream: InputStream,
+    bufferSize: Int = DefaultBufSize,
+    reset: () => Source = null,
+    close: () => Unit = null
+  )(implicit codec: Codec = Codec.default): Source =
+  {
+    // workaround for default arguments being unable to refer to other parameters
+    val resetFn = if (reset == null) () => fromInputStream(inputStream, bufferSize, reset, close) else reset
+    new BufferedSource(inputStream)(codec) .
+      withReset (resetFn) .
+      withClose (close)
+  }
 }
 
+// Coming Soon?
+//
+// abstract class Source2[T] extends Iterable[T] { }
+// 
+// abstract class ByteSource() extends Source2[Byte] { }
+// 
+// abstract class CharSource(implicit codec: Codec = Codec.default) extends Source2[Char] { }
 
 /** The class <code>Source</code> implements an iterable representation
  *  of source data.  Calling method <code>reset</code> returns an identical,

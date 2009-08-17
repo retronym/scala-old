@@ -102,33 +102,16 @@ object Iterator {
       else empty.next()
   }
 
-  /** An iterator that repeatedly applies a given function to a start value.
-   *
-   *  @param start the start value of the iterator
-   *  @param len   the number of elements returned by the iterator
-   *  @param f     the function that's repeatedly applied
-   *  @return      the iterator returning `len` values in the sequence `start, f(start), f(f(start)), ...`
-   */
-  def iterate(start: Int, len: Int)(f: Int => Int) = new Iterator[Int] {
-    private var acc = start
-    private var i = 0
-    def hasNext: Boolean = i < len
-    def next(): Int =
-      if (hasNext) { val result = f(acc); i += 1; result }
-      else empty.next()
-  }
-
-  /** An infinite iterator that repeatedly applies a given function to a start value.
+  /** An infinite iterator that repeatedly applies a given function to the previous result.
    *
    *  @param start the start value of the iterator
    *  @param f     the function that's repeatedly applied
    *  @return      the iterator returning the infinite sequence of values `start, f(start), f(f(start)), ...`
    */
-  def iterate(start: Int)(f: Int => Int) = new Iterator[Int] {
-    private var acc = start
-    private var i = 0
+  def iterate[T](start: T)(f: T => T): Iterator[T] = new Iterator[T] {
+    private[this] var acc = start
     def hasNext: Boolean = true
-    def next(): Int = { val result = f(acc); i += 1; result }
+    def next(): T = { val res = acc ; acc = f(acc) ; res }
   }
 
   /** An infinite-length iterator which returns successive values from some start value.
@@ -148,6 +131,18 @@ object Iterator {
     private var i = start
     def hasNext: Boolean = true
     def next(): Int = { val result = i; i += step; result }
+  }
+  
+  /**
+   * Create an infinite iterator based on the given expression
+   * (which is recomputed for every element)
+   *
+   * @param elem the element composing the resulting iterator
+   * @return the iterator containing an infinite number of elem
+   */
+  def continually[A](elem: => A): Iterator[A] = new Iterator[A] {
+    def hasNext = true
+    def next = elem
   }
 
   /** A wrapper class for the `flatten `method that is added to class Iterator with implicit conversion @see iteratorIteratorWrapper.
@@ -714,6 +709,79 @@ trait Iterator[+A] { self =>
         hdDefined = false
         hd
       } else self.next
+  }
+  
+  /** Since I cannot reliably get take(n) to influence the original
+   *  iterator (it seems to depend on some ordering issue I don't
+   *  understand) this method takes the way one might expect, leaving
+   *  the original iterator with 'size' fewer elements.
+   */
+  private def takeDestructively(size: Int): Sequence[A] = {
+    val buf = new ArrayBuffer[A]
+    var i = 0
+    while (self.hasNext && i < size) {
+      buf += self.next
+      i += 1
+    }
+    buf
+  }
+  
+  /** Returns an iterator which groups this iterator into fixed size 
+   *  blocks, possibly except for the final block.  For instance:
+   *    <code>(1 to 8).iterator grouped 3</code>
+   *  will return an iterator equivalent to
+   *    Iterator(Seq(1,2,3), Seq(4,5,6), Seq(7,8))
+   */
+  def grouped(size: Int): Iterator[Sequence[A]] = new Iterator[Sequence[A]] {
+    def hasNext = self.hasNext
+    def next = self takeDestructively size toList
+  }
+  /** Returns an iterator which presents a "sliding window" of the
+   *  given size across this iterator.  For instance:
+   *    <code>(1 to 5).iterator sliding 3</code>
+   *  will return an iterator equivalent to
+   *    Iterator(Seq(1,2,3), Seq(2,3,4), Seq(3,4,5))
+   * 
+   *  The optional 'step' parameter if given advances the window
+   *  by the given number of positions.
+   * 
+   *  Note: if your parameters don't perfectly "fit" the sequence,
+   *  the last result may be of a size less than windowSize, and the
+   *  last step may be less than the given step, or both.  What is
+   *  guaranteed is that each element of the original iterator will
+   *  appear in at least one sequence in the sliding iterator, UNLESS
+   *  the step size is larger than the windowSize.
+   */
+  def sliding(windowSize: Int, step: Int = 1): Iterator[Sequence[A]] = {
+    require(windowSize >= 1 && step >= 1)
+
+    val buf = takeDestructively(windowSize)
+    
+    if (!self.hasNext) Iterator single buf.toList
+    else new Iterator[Sequence[A]] {
+      private[this] var filled = true
+      private[this] var buffer = ArrayBuffer(buf: _*)
+      def fill() = {
+        val xs = self takeDestructively step
+        val len = xs.length min buf.size
+        
+        (len > 0) && {
+          buffer trimStart len
+          buffer ++= (xs takeRight len)
+          filled = true
+          true
+        }
+      }
+        
+      def hasNext = filled || fill()
+      def next = {
+        if (!filled)
+          fill()
+        
+        filled = false
+        buffer.toList
+      }
+    }
   }
 
   /** Returns the number of elements in this iterator.
