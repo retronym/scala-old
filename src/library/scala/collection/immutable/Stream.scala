@@ -221,7 +221,24 @@ self =>
     loop("", this)
     b
   }
-   
+
+  override def mkString(start: String, sep: String, end: String): String = {
+    this.force
+    super.mkString(start, sep, end)
+  }
+
+  override def mkString(sep: String): String = {
+    this.force
+    super.mkString(sep)
+  }
+
+  override def mkString: String = {
+    this.force
+    super.mkString
+  }
+
+  override def toString = super.mkString(stringPrefix + "(", ", ", ")")
+
   /** Returns the <code>n</code> first elements of this stream, or else the whole 
    *  stream, if it has less than <code>n</code> elements.
    *
@@ -324,6 +341,19 @@ self =>
       these = these.tail
     }
     result
+  }
+
+  override def flatten[B](implicit toTraversable: A => Traversable[B]): Stream[B] = {
+    def flatten1(t: Traversable[B]): Stream[B] =
+      if (!t.isEmpty)
+        new Stream.Cons(t.head, flatten1(t.tail))
+      else
+        tail.flatten
+
+    if (isEmpty)
+      Stream.empty
+    else
+      flatten1(toTraversable(head))
   }
 
   /** Defines the prefix of this object's <code>toString</code> representation as ``Stream''.
