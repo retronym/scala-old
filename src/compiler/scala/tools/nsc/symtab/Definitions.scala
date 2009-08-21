@@ -111,8 +111,8 @@ trait Definitions {
         if (!ClassClass.unsafeTypeParams.isEmpty && !phase.erasedTypes)
           appliedType(ClassClass.tpe, List(classType))
         else ClassClass.tpe
-      def Predef_identity = getMember(PredefModule, nme.identity)
       def Predef_error    = getMember(PredefModule, nme.error)
+      def Predef_conforms = getMember(PredefModule, nme.conforms)
     lazy val ConsoleModule: Symbol = getModule("scala.Console")
     lazy val ScalaRunTimeModule: Symbol = getModule("scala.runtime.ScalaRunTime")
       def SeqFactory = getMember(ScalaRunTimeModule, nme.Seq)
@@ -180,6 +180,8 @@ trait Definitions {
     // scala.reflect
     lazy val ManifestClass        = getClass("scala.reflect.Manifest")
     lazy val ManifestModule       = getModule("scala.reflect.Manifest")
+    lazy val FullManifestClass   = getClass("scala.reflect.FullManifest")
+    lazy val FullManifestModule  = getModule("scala.reflect.FullManifest")
     lazy val OptManifestClass     = getClass("scala.reflect.OptManifest")
     lazy val NoManifest           = getModule("scala.reflect.NoManifest")
     lazy val CodeClass            = getClass(sn.Code)
@@ -209,7 +211,7 @@ trait Definitions {
       val list = (countFrom to arity).toList map (i => getClass(("scala." + name + i): Name))
       if (countFrom == 0) list.toArray
       else (NoSymbol :: list).toArray
-    }
+    } 
     
     val MaxTupleArity, MaxProductArity, MaxFunctionArity = 22
     lazy val TupleClass     = mkArityArray("Tuple", MaxTupleArity)
