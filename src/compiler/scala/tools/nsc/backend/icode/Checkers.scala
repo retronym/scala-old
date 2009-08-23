@@ -74,7 +74,7 @@ abstract class Checkers {
     def checkICodes: Unit = {
       if (settings.verbose.value)
       println("[[consistency check at the beginning of phase " + globalPhase.name + "]]")
-      classes.values foreach check
+      classes.valuesIterator foreach check
     }
 
     def check(cls: IClass) {
@@ -114,12 +114,12 @@ abstract class Checkers {
 
       def append(elems: List[BasicBlock]) = elems foreach appendBlock;
       def appendBlock(bl: BasicBlock) =
-        if ( !worklist.exists(bl.==) )
-          worklist + bl;
+        if (!(worklist contains bl))
+          worklist += bl
 
       in.clear;  out.clear;
       code = c;
-      worklist + c.startBlock;
+      worklist += c.startBlock
       for (bl <- c.blocks) {
         in  += (bl -> emptyStack)
         out += (bl -> emptyStack)

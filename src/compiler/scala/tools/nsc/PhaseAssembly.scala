@@ -105,14 +105,14 @@ trait PhaseAssembly { self: Global =>
       var chain: List[SubComponent] = Nil
 
       var lvl = 1
-      var nds = nodes.values.filter(_.level == lvl).toList
+      var nds = nodes.valuesIterator.filter(_.level == lvl).toList
       while(nds.size > 0) {
 	nds = nds.sort((n1,n2) => (n1.phasename compareTo n2.phasename) < 0)
 	for (n <- nds) {
 	  chain = chain ::: n.phaseobj.get
 	}      
 	lvl += 1
-	nds = nodes.values.filter(_.level == lvl).toList
+	nds = nodes.valuesIterator.filter(_.level == lvl).toList
       }
       chain
     }
@@ -170,7 +170,7 @@ trait PhaseAssembly { self: Global =>
 	  if (sanity.length == 0) {
 	    throw new FatalError("There is no runs right after dependency, where there should be one! This is not supposed to happen!")
 	  } else if (sanity.length > 1) {
-	    var msg = "Multiple phases want to run right after the phase " + sanity.first.to.phasename + "\n"
+	    var msg = "Multiple phases want to run right after the phase " + sanity.head.to.phasename + "\n"
 	    msg += "Phases: "
 	    sanity = sanity.sort((e1,e2) => (e1.frm.phasename compareTo e2.frm.phasename) < 0)
 	    for (edge <- sanity) {
@@ -203,7 +203,7 @@ trait PhaseAssembly { self: Global =>
      *  dependency on something that is dropped.
      */
     def removeDanglingNodes() {
-      var dnodes = nodes.values.filter(_.phaseobj.isEmpty)
+      var dnodes = nodes.valuesIterator filter (_.phaseobj.isEmpty)
       for (node <- dnodes) {
 	val msg = "dropping dependency on node with no phase object: "+node.phasename
         informProgress(msg)
@@ -308,7 +308,7 @@ trait PhaseAssembly { self: Global =>
     sbuf.append("digraph G {\n")
     for (edge <- graph.edges) {
       sbuf.append("\"" + edge.frm.allPhaseNames + "(" + edge.frm.level + ")" + "\"->\"" + edge.to.allPhaseNames + "(" + edge.to.level + ")" + "\"")
-      if (! edge.frm.phaseobj.get.first.internal) {
+      if (! edge.frm.phaseobj.get.head.internal) {
        	extnodes += edge.frm
       }
       edge.frm.phaseobj match { case None => null case Some(ln) => if(ln.size > 1) fatnodes += edge.frm }

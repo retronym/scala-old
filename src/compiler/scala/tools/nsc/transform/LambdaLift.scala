@@ -29,7 +29,7 @@ abstract class LambdaLift extends InfoTransform {
           typeRef(apply(sym.owner.enclClass.thisType), sym, args)
         } else mapOver(tp)
       case ClassInfoType(parents, decls, clazz) =>
-        val parents1 = List.mapConserve(parents)(this)
+        val parents1 = parents mapConserve (this)
         if (parents1 eq parents) tp
         else ClassInfoType(parents1, decls, clazz)
       case _ =>
@@ -245,7 +245,7 @@ abstract class LambdaLift extends InfoTransform {
 
       do {
         changedFreeVars = false
-        for (caller <- called.keys;
+        for (caller <- called.keysIterator;
              callee <- called(caller).iterator;
              fv <- freeVars(callee))
           markFree(fv, caller)
@@ -262,7 +262,7 @@ abstract class LambdaLift extends InfoTransform {
       }
 
       atPhase(phase.next) {
-        for (owner <- free.keys) {
+        for (owner <- free.keysIterator) {
           if (settings.debug.value)
             log("free(" + owner + owner.locationString + ") = " + free(owner).iterator.toList);
           proxies(owner) =
@@ -427,7 +427,7 @@ abstract class LambdaLift extends InfoTransform {
     override def transformUnit(unit: CompilationUnit) {
       computeFreeVars
       atPhase(phase.next)(super.transformUnit(unit))
-      assert(liftedDefs.size == 0, liftedDefs.keys.toList)
+      assert(liftedDefs.size == 0, liftedDefs.keysIterator.toList)
     }
   } // class LambdaLifter
 
