@@ -13,6 +13,7 @@ package scala.collection.immutable
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.generic._
+import scala.annotation.tailrec
 
 /**
  * <p>The class <code>Stream</code> implements lazy lists where elements
@@ -40,7 +41,7 @@ abstract class Stream[+A] extends LinearSequence[A]
                              with LinearSequenceTemplate[A, Stream[A]] {
 self =>
   override def companion: Companion[Stream] = Stream
- 
+
   import collection.{Traversable, Iterable, Sequence, Vector}
 
   /** is this stream empty? */
@@ -169,6 +170,32 @@ self =>
     var rest = this dropWhile (!p(_))
     if (rest.isEmpty) Stream.Empty
     else new Stream.Cons(rest.head, rest.tail filter p)
+  }
+
+  /** Apply the given function <code>f</code> to each element of this linear sequence
+   *  (while respecting the order of the elements).
+   *
+   *  @param f the treatment to apply to each element.
+   *  @note  Overridden here as final to trigger tail-call optimization, which replaces
+   *         'this' with 'tail' at each iteration. This is absolutely necessary
+   *         for allowing the GC to collect the underlying stream as elements are
+   *         consumed.
+   */
+  @tailrec
+  override final def foreach[B](f: A => B) {
+    if (!this.isEmpty) {
+      f(head)
+      tail.foreach(f)
+    }
+  }
+  
+  /** Stream specialization of foldLeft which allows GC to collect
+   *  along the way.
+   */
+  @tailrec
+  override final def foldLeft[B](z: B)(op: (B, A) => B): B = {
+    if (this.isEmpty) z
+    else tail.foldLeft(op(z, head))(op)
   }
 
   /** Returns all the elements of this stream that satisfy the
