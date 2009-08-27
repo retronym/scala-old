@@ -11,6 +11,7 @@
 
 package scala.collection.generic
 import scala.collection._
+import scala.reflect.ClassManifest
 
 // import immutable.{List, Stream, Nil} //!!!
 import mutable.{Buffer, ArrayBuffer, ListBuffer}
@@ -133,6 +134,38 @@ self =>
     for (x <- this) result += 1
     result
   }	
+
+  /** Returns the sum of all elements with respect to the numeric operations in `num` */
+  def sum[B >: A](implicit num: Numeric[B]): B = {
+    var acc = num.zero
+    for (x <- self) acc = num.plus(acc, x)
+    acc
+  }
+    
+  /** Returns the product of all elements with respect to the numeric operations in `num` */
+  def product[B >: A](implicit num: Numeric[B]): B = {
+    var acc = num.one
+    for (x <- self) acc = num.times(acc, x)
+    acc
+  }
+  
+  /** Returns the minimal element with respect to the given ordering `cmp` */
+  def min[B >: A](implicit cmp: Ordering[B]): A = {
+    require(!self.isEmpty, "min(<empty>)")
+    var acc = self.head
+    for (x <- self) 
+      if (cmp.lt(x, acc)) acc = x
+    acc
+  }
+
+  /** Returns the maximal element with respect to the given ordering `cmp` */
+  def max[B >: A](implicit cmp: Ordering[B]): A = {
+    require(!self.isEmpty, "max(<empty>)")
+    var acc = self.head
+    for (x <- self) 
+      if (cmp.gt(x, acc)) acc = x
+    acc
+  }
 
   /** Returns true if this collection is known to have finite size.
    *  This is the case if the collection type is strict, or if the
@@ -686,7 +719,7 @@ self =>
   /** Converts this traversable to a fresh Array containing all elements.
    *  @note  Will not terminate for infinite-sized collections.
    */
-  def toArray[B >: A]: Array[B] = {
+  def toArray[B >: A : ClassManifest]: Array[B] = {
     val result = new Array[B](size)
     copyToArray(result, 0)
     result
@@ -706,6 +739,11 @@ self =>
    *  @note Will not terminate for infinite-sized collections.
    */	
   def toSequence: Sequence[A] = toList
+ 
+  /** Returns a vector with all elements in this traversable object.
+   *  @note Will not terminate for infinite-sized collections.
+   */	
+  def toVector[B >: A]: mutable.Vector[B] = (new ArrayBuffer[B] ++= thisCollection)
  
   /** Returns a stream with all elements in this traversable object.
    */

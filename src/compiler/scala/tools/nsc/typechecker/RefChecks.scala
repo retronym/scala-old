@@ -631,6 +631,9 @@ abstract class RefChecks extends InfoTransform {
               nonSensibleWarning(pre+"values of types "+normalizeAll(qual.tpe.widen)+" and "+normalizeAll(args.head.tpe.widen),
                                  alwaysEqual) // @MAT normalize for consistency in error message, otherwise part is normalized due to use of `typeSymbol', but the rest isn't
             def hasObjectEquals = receiver.info.member(nme.equals_) == Object_equals
+            // see if it has any == methods beyond Any's and AnyRef's: ticket #2240
+            def hasOverloadedEqEq = receiver.info.member(nme.EQ).alternatives.length > 2
+            
             if (formal == UnitClass && actual == UnitClass)
               nonSensible("", true)
             else if ((receiver == BooleanClass || receiver == UnitClass) && 
@@ -646,7 +649,7 @@ abstract class RefChecks extends InfoTransform {
                      (name == nme.EQ || name == nme.LE))
               nonSensible("non-null ", false)
             else if ((isNew(qual) || isNew(args.head)) && hasObjectEquals &&
-                     (name == nme.EQ || name == nme.NE))
+                     (name == nme.EQ || name == nme.NE) && !hasOverloadedEqEq)
               nonSensibleWarning("a fresh object", false)
           case _ =>
         }
@@ -705,13 +708,7 @@ abstract class RefChecks extends InfoTransform {
             List(transform(cdef))
           }
         } else {
-          val vdef = 
-            localTyper.typed {
-              atPos(tree.pos) {
-                gen.mkModuleVarDef(sym)
-              }
-            }
-
+          val vdef = localTyper.typedPos(tree.pos) { gen.mkModuleVarDef(sym) }
           val ddef = 
             atPhase(phase.next) {
               localTyper.typed {
@@ -927,6 +924,19 @@ abstract class RefChecks extends InfoTransform {
         if (tpt.tpe.typeSymbol == ArrayClass && args.length >= 2) =>
           unit.deprecationWarning(tree.pos, 
             "new Array(...) with multiple dimensions has been deprecated; use Array.ofDim(...) instead")
+          val manif = {
+            var etpe = tpt.tpe
+            for (_ <- args) { etpe = etpe.typeArgs.headOption.getOrElse(NoType) }
+            if (etpe == NoType) {
+              unit.error(tree.pos, "too many dimensions for array creation")
+              Literal(Constant(null))
+            } else {
+              localTyper.getManifestTree(tree.pos, etpe, false)
+            }
+          }
+          result = localTyper.typedPos(tree.pos) {
+            Apply(Apply(Select(gen.mkAttributedRef(ArrayModule), nme.ofDim), args), List(manif))
+          }
           currentApplication = tree
 
         case Apply(fn, args) =>

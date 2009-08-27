@@ -74,7 +74,7 @@ trait Traversable[+A] extends TraversableTemplate[A, Traversable[A]]
   override def copyToBuffer[B >: A](dest: Buffer[B])
   override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int)
   override def copyToArray[B >: A](xs: Array[B], start: Int)
-  override def toArray[B >: A]: Array[B]
+  override def toArray[B >: A : ClassManifest]: Array[B]
   override def toList: List[A]
   override def toIterable: Iterable[A]
   override def toSequence: Sequence[A]
@@ -102,118 +102,5 @@ object Traversable extends TraversableFactory[Traversable] { self =>
   implicit def builderFactory[A]: BuilderFactory[A, Traversable[A], Coll] = new VirtualBuilderFactory[A]
 
   def newBuilder[A]: Builder[A, Traversable[A]] = immutable.Traversable.newBuilder[A]
-
-  /** A wrapper class which adds `min` and `max` methods to iterables of an element type that has an Ordering.
-   */
-  class ComparableTraversableOps[A](self: Traversable[A], cmp: Ordering[A]) {
-    
-    /** Returns the minimal element of the wrapped iterable `self` with respect to the given ordering `cmp` */
-    def min: A = {
-      require(!self.isEmpty, "min(<empty>)")
-      var acc = self.head
-      for (x <- self) 
-        if (cmp.lt(x, acc)) acc = x
-      acc
-    }
-
-    /** Returns the maximal element of the wrapped iterable `self` with respect to the given ordering `cmp` */
-    def max: A = {
-      require(!self.isEmpty, "max(<empty>)")
-      var acc = self.head
-      for (x <- self) 
-        if (cmp.gt(x, acc)) acc = x
-      acc
-    }
-  }
-                                                           
-  /** A wrapper class which adds `sum` and `product` methods to iterables of an element type that is `Numeric`.
-   */
-  class NumericTraversableOps[A](self: Traversable[A], num: Numeric[A]) {
-    
-    /** Returns the sum of all elements of the wrapped iterable `self` with respect to the numeric operations in `num` */
-    def sum: A = {
-      var acc = num.zero
-      for (x <- self) acc = num.plus(acc, x)
-      acc
-    }
-
-    /** Returns the product of all elements of the wrapped iterable `self` with respect to the numeric operations in `num` */
-    def product: A = {
-      var acc = num.one
-      for (x <- self) acc = num.times(acc, x)
-      acc
-    }
-  }
-
-  /** A wrapper class which adds `flatten` and `transpose` methods to iterables or iterable element type`.
-   */
-  class TraversableTraversableOps[This <: Traversable[Traversable[A]], A](self: This) {
-
-    /** Returns the concatenation of all elements of the wrapped iterable `self` */
-    def flatten[That](implicit bf: BuilderFactory[A, That, This]): That = {
-      val b = bf(self)
-      for (xs <- self)
-        b ++= xs
-      b.result
-    }
-
-    /** Returns the transposition of the wrapped iterable `self`: rows become columns and columns become rows. 
-     */
-    def transpose[Row, That](implicit bf: BuilderFactory[A, Row, This], bbf: BuilderFactory[Row, That, This]): That = {
-      val bs: Array[Builder[A, Row]] = self.head.map(_ => bf(self))(Traversable.builderFactory[Builder[A, Row]]).toArray 
-      for (xs <- self) {
-        var i = 0
-        for (x <- xs) {
-          bs(i) += x
-          i += 1
-        }
-      }
-      val bb = bbf(self)
-      for (b <- bs) bb += b.result
-      bb.result
-    }
-  }	
-
-  /** A wrapper class which adds an `unzip` method to iterable whose elements are pairs.
-  	*/	
-  class PairTraversableOps[This <: Traversable[(A1, A2)], A1, A2](self: This) {
-
-    /** Returns a pair of iterables consisting of the first, respectively second, component of all
-     *  elements in the wrapped iterable `self`.
-     */
-    def unzip[That1, That2](implicit bf1: BuilderFactory[A1, That1, This], bf2: BuilderFactory[A2, That2, This]): (That1, That2) = {
-      val b1 = bf1(self)
-      val b2 = bf2(self)
-      for ((x1, x2) <- self) {
-        b1 += x1
-        b2 += x2
-      }
-      (b1.result, b2.result)
-    }
-  }  
-
-  /** Implicit wrapper conversion of iterables with elements admitting comparison.
-   *  @see ComparableTraversableOps
-   */
-  implicit def comparableTraversableWrapper[A](self: Traversable[A])(implicit cmp: Ordering[A]) = 
-    new ComparableTraversableOps(self, cmp)
-
-  /** Implicit wrapper conversion of iterables with numeric elements.
-   *  @see NumericTraversableOps
-   */
-  implicit def numericTraversableWrapper[A](self: Traversable[A])(implicit num: Numeric[A]) = 
-    new NumericTraversableOps(self, num)
-  
-  /** Implicit wrapper conversion of iterables with iterable elements.
-   *  @see TraversableTraversableOps
-   */
-  implicit def traversableTraversableWrapper[This <: Traversable[Traversable[A]], A](self: This) =
-    new TraversableTraversableOps[This, A](self) // !!! error if type parameters are omitted 
-  
-  /** Implicit wrapper conversion of iterables with pairs as elements.
-   *  @see PairTraversableOps
-   */		
-  implicit def pairTraversableWrapper[This <: Traversable[(A1, A2)], A1, A2](self: This) = 
-    new PairTraversableOps[This, A1, A2](self)
 }
 
