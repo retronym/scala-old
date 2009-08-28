@@ -4,7 +4,7 @@ task :default => [:debug_java]
 
 task :debug_java do
   puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
-  puts ENV
+  puts ENV.inspect
   system! "which java"
   system! "which javac"
   system! "which ant"
