@@ -9,7 +9,7 @@ task :debug_java do
   system! "which javac"
   system! "which ant"
   system "echo $JAVA_HOME"
-
+  system! 'ant'
 end
 
 task :test do
