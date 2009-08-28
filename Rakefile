@@ -4,6 +4,7 @@ task :default => [:test]
 
 task :test do
   puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
+  puts "system JAVA_HOME => #{system('echo $JAVA_HOME')}"
   
   classpath = [
     File.join(".", "runcoderun", "ant.jar"),
