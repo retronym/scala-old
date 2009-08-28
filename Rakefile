@@ -7,6 +7,7 @@ task :debug_java do
   puts ENV
   system! "which java"
   system! "which javac"
+  system! "which ant"
 end
 
 task :test do
