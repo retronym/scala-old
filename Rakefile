@@ -4,7 +4,6 @@ task :default => [:test]
 
 task :test do
   puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
-  puts "system JAVA_HOME => #{system('echo $JAVA_HOME')}"
   
   classpath = [
     File.join(".", "runcoderun", "ant.jar"),
@@ -13,5 +12,5 @@ task :test do
     # File.join(".", "runcoderun", "tools.jar"),
     # File.join(".", "lib", "scala-library.jar")
   ].join(File::PATH_SEPARATOR)
-  system "java -cp #{classpath} org.apache.tools.ant.Main -emacs test"
+  system "java -cp #{classpath} org.apache.tools.ant.Main -emacs test" || abort
 end
