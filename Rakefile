@@ -1,9 +1,15 @@
 # Ruby Rake file to allow automatic build testing on RunCodeRun.com
 
-task :default => [:test]
+task :default => [:debug_java]
+
+task :debug_java do
+  puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
+  puts ENV
+  system! "java --version"
+  system! "javac --version"
+end
 
 task :test do
-  puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
   classpath = [
     File.join(".", "runcoderun", "ant.jar"),
     File.join(".", "runcoderun", "ant-launcher.jar"),
@@ -14,4 +20,9 @@ task :test do
   result = system "export JAVA_HOME=/usr/lib/jvm/java-6-sun && java -cp #{classpath} org.apache.tools.ant.Main -emacs test"
   puts "result of system java call: #{result}"
   result || abort
+end
+
+
+def system!(cmd)
+  system(cmd) || abort
 end
