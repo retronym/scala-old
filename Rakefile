@@ -4,7 +4,6 @@ task :default => [:test]
 
 task :test do
   puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
-  /usr/lib/jvm/java-6-sun
   classpath = [
     File.join(".", "runcoderun", "ant.jar"),
     File.join(".", "runcoderun", "ant-launcher.jar"),
