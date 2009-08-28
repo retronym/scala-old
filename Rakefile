@@ -5,8 +5,8 @@ task :default => [:debug_java]
 task :debug_java do
   puts "JAVA_HOME => #{ENV['JAVA_HOME']}"
   puts ENV
-  system! "java --version"
-  system! "javac --version"
+  system! "which java"
+  system! "which javac"
 end
 
 task :test do
