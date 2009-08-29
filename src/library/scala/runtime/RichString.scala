@@ -13,11 +13,11 @@ package scala.runtime
 
 import scala.util.matching.Regex
 import collection.generic._
-//import collection.mutable.StringBuilder
 import collection.immutable.Vector
+import collection.immutable.{ StringVector => SV }
 
-object RichString {
-
+object RichString
+{
   def newBuilder: Builder[Char, RichString] = new StringBuilder() mapResult (new RichString(_))
   implicit def builderFactory: BuilderFactory[Char, RichString, RichString] = new BuilderFactory[Char, RichString, RichString] { def apply(from: RichString) = newBuilder }
   implicit def builderFactory2: BuilderFactory[Char, RichString, String] = new BuilderFactory[Char, RichString, String] { def apply(from: String) = newBuilder }
@@ -27,6 +27,7 @@ object RichString {
   private final val FF: Char = 0x0C
   private final val CR: Char = 0x0D
   private final val SU: Char = 0x1A
+  private final val CRLF: String = Array(CR, LF).mkString
 }
 
 import RichString._
@@ -49,9 +50,9 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
   /** return n times the current string 
    */
   def * (n: Int): String = {
-    val buf = new StringBuilder
-    for (i <- 0 until n) buf append self
-    buf.toString
+    val sb = new StringBuilder
+    for (_ <- 1 to n) sb append self
+    sb.toString
   }
 
   override def compare(other: String) = self compareTo other
@@ -71,17 +72,13 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
    *    (0x0D hex), the CR character is also stripped (Windows convention).
    *  </p>
    */
-  def stripLineEnd: String = {
-    val len = self.length
-    if (len == 0) self
-    else {
-      val last = apply(len - 1)
-      if (isLineBreak(last))
-        self.substring(0, if (last == LF && len >= 2 && apply(len - 2) == CR) len - 2 else len - 1)
-      else 
-        self
+  def stripLineEnd: String =
+    if (self.isEmpty) "" 
+    else if (SV.endsWith(self, CRLF)) SV.drop(self, 2)
+    else SV.last(self) match {
+      case LF | FF  => SV.init(self)
+      case _        => self
     }
-  }
 
   /** <p>
    *    Return all lines in this string in an iterator, including trailing
@@ -109,39 +106,34 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
       self.substring(start, index min len)
     }
   }
+  
+  // !!! - at least one of these identical methods must be intended for deprecation?
 
   /** Return all lines in this string in an iterator, excluding trailing line
    *  end characters, i.e. apply <code>.stripLineEnd</code> to all lines
    *  returned by <code>linesWithSeparators</code>.
    */
-  def lines: Iterator[String] = 
-    linesWithSeparators map (line => new RichString(line).stripLineEnd)
+  def lines: Iterator[String] = linesWithSeparators map (_.stripLineEnd)  
 
   /** Return all lines in this string in an iterator, excluding trailing line
    *  end characters, i.e. apply <code>.stripLineEnd</code> to all lines
    *  returned by <code>linesWithSeparators</code>.
    */
-  def linesIterator: Iterator[String] = 
-    linesWithSeparators map (line => new RichString(line).stripLineEnd)
+  def linesIterator: Iterator[String] = lines
 
   /** Returns this string with first character converted to upper case */
   def capitalize: String =
-    if (self == null) null
-    else if (self.length == 0) ""
-    else {
-      val chars = self.toCharArray
-      chars(0) = chars(0).toUpperCase
-      new String(chars)
-    }
+    if (self.isEmpty) "" 
+    else SV.head(self).toUpperCase.toString + SV.tail(self)
 
   /** Returns this string with the given <code>prefix</code> stripped. */
   def stripPrefix(prefix: String) =
-    if (self.startsWith(prefix)) self.substring(prefix.length)
+    if (SV.startsWith(self, prefix)) SV.drop(self, prefix.length)
     else self
 
   /** Returns this string with the given <code>suffix</code> stripped. */
   def stripSuffix(suffix: String) =
-    if (self.endsWith(suffix)) self.substring(0, self.length() - suffix.length)
+    if (SV.endsWith(self, suffix)) SV.dropRight(self, suffix.length)
     else self
 
   /** <p>
@@ -177,12 +169,12 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
   private def escape(ch: Char): String = "\\Q" + ch + "\\E"
 
   @throws(classOf[java.util.regex.PatternSyntaxException])
-  def split(separator: Char): Array[String] = self.split(escape(separator))
+  def split(separator: Char): Array[String] = self split escape(separator)
 
   @throws(classOf[java.util.regex.PatternSyntaxException])
   def split(separators: Array[Char]): Array[String] = {
     val re = separators.foldLeft("[")(_+escape(_)) + "]"
-    self.split(re)
+    self split re
   }
 
   /** You can follow a string with `.r', turning
@@ -216,6 +208,8 @@ class RichString(val self: String) extends Proxy with Vector[Char] with VectorTe
     result
   }
   */
+  
+  override def foreach[T](f: Char => T): Unit = SV.foreach(self, f)
 
   /** <p>
    *  Uses the underlying string as a pattern (in a fashion similar to
