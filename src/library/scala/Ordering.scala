@@ -105,11 +105,30 @@ trait Ordering[T] extends Comparator[T] with PartialOrdering[T] {
 
 object Ordering
 {
+  /** This lets you reference an implicitly available Ordering directly,
+   *  for instance: Ordering[String].compare("a", "b")
+   */
   def apply[T](implicit ord : Ordering[T]) = ord
   
-  def fromLessThan[T](cmp: (T, T) => Boolean): Ordering[T] = new Ordering[T] {
-    def compare(x: T, y: T) = if (cmp(x, y)) -1 else if (cmp(y, x)) 1 else 0
-  }
+  /** This implicit makes it possible to automatically generate an Ordering[T] 
+   *  based on a preexisting Ordering[U].  For example, a list of Strings could
+   *  be sorted by length:
+   *    List("abc", "ab", "a") sortWith ((_: String).length)
+   *  And because an Ordering[Int] already exists, the given String => Int is
+   *  enough to construct the ordering.
+   */
+  implicit def fromOtherOrdering[T, U](f: T => U)(implicit ord: Ordering[U]): Ordering[T] =
+    new Ordering[T] {
+      def compare(x: T, y: T) = ord.compare(f(x), f(y))
+    }
+  
+  /** This implicit covers the more "traditional" argument to sort
+   *  functions, a binary function which compares two elements.
+   */
+  implicit def fromLessThan[T](cmp: (T, T) => Boolean): Ordering[T] =
+    new Ordering[T] {
+      def compare(x: T, y: T) = if (cmp(x, y)) -1 else if (cmp(y, x)) 1 else 0
+    }
 
   def ordered[A <: Ordered[A]] : Ordering[A] = new Ordering[A] {
     def compare(x : A, y : A) = x.compare(y);

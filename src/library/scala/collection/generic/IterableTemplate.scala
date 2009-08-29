@@ -220,6 +220,12 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
    *      .sortWith((e1, e2) => (e1 compareTo e2) &lt; 0) =
    *    List("Bob", "John", "Steve", "Tom")</pre>
    */
+  // def sortWith(lt: (A, A) => Boolean)(implicit m: ClassManifest[A @uncheckedVariance]): This =
+  //   sortWith(Ordering fromLessThan lt)
+  //   
+  // def sortWith(ordering: Ordering[A @uncheckedVariance])(implicit m: ClassManifest[A @uncheckedVariance]): This =
+  //   sortWith(ordering.lt _)(m)
+    
   def sortWith(lt: (A, A) => Boolean)(implicit m: ClassManifest[A @uncheckedVariance]): This = {
     // !!! can we supply a default argument to m: ClassManifest ?
     val arr = toArray
