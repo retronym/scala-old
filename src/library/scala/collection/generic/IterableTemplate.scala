@@ -10,6 +10,7 @@
 
 package scala.collection.generic
 import scala.collection._
+import annotation.unchecked.uncheckedVariance
 
 import util.control.Breaks._
 // import immutable.Stream // !!!
@@ -144,6 +145,91 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
         b += x
       }
     }
+    b.result
+  }
+
+
+  /** Returns an iterable formed from this iterable and another iterable
+   *  by combining corresponding elements in pairs.
+   *  If one of the two iterables is longer than the other, its remaining elements are ignored.
+   *  @param   that  The iterable providing the second half of each result pair
+   */
+  def zip[A1 >: A, B, That](that: Iterable[B])(implicit bf: BuilderFactory[(A1, B), That, This]): That = {
+    val b = bf(thisCollection)
+    val these = this.iterator
+    val those = that.iterator
+    while (these.hasNext && those.hasNext)
+      b += ((these.next, those.next))
+    b.result
+  }
+
+  /** Returns a iterable formed from this iterable and the specified iterable
+   *  <code>that</code> by associating each element of the former with
+   *  the element at the same position in the latter.
+   *
+   *  @param that     iterable <code>that</code> may have a different length
+   *                  as the self iterable.
+   *  @param thisElem element <code>thisElem</code> is used to fill up the
+   *                  resulting iterable if the self iterable is shorter than
+   *                  <code>that</code>
+   *  @param thatElem element <code>thatElem</code> is used to fill up the
+   *                  resulting iterable if <code>that</code> is shorter than
+   *                  the self iterable
+   *  @return         <code>Sequence((a<sub>0</sub>,b<sub>0</sub>), ...,
+   *                  (a<sub>n</sub>,b<sub>n</sub>), (elem,b<sub>n+1</sub>),
+   *                  ..., {elem,b<sub>m</sub>})</code>
+   *                  when <code>[a<sub>0</sub>, ..., a<sub>n</sub>] zip
+   *                  [b<sub>0</sub>, ..., b<sub>m</sub>]</code> is
+   *                  invoked where <code>m &gt; n</code>.
+   *  
+   */
+  def zipAll[B, A1 >: A, That](that: Iterable[B], thisElem: A1, thatElem: B)(implicit bf: BuilderFactory[(A1, B), That, This]): That = {  
+    val b = bf(thisCollection)
+    val these = this.iterator
+    val those = that.iterator
+    while (these.hasNext && those.hasNext)
+      b += ((these.next, those.next))
+    while (these.hasNext)
+      b += ((these.next, thatElem))
+    while (those.hasNext)
+      b += ((thisElem, those.next))
+    b.result
+  }
+
+  /** Zips this iterable with its indices (startiong from 0). 
+   */
+  def zipWithIndex[A1 >: A, That](implicit bf: BuilderFactory[(A1, Int), That, This]): That = {
+    val b = bf(thisCollection)
+    var i = 0
+    for (x <- this) {
+      b += ((x, i))
+      i +=1 
+    }
+    b.result
+  }
+  
+  /** Sort the iterable according to the comparison function
+   *  <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>,
+   *  which should be true iff <code>e1</code> is smaller than
+   *  <code>e2</code>.
+   *  The sort is stable. That is elements that are equal wrt `lt` appear in the
+   *  same order in the sorted sequence as in the original.
+   *
+   *  @param lt the comparison function
+   *  @return   an iterable sorted according to the comparison function
+   *            <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>.
+   *  @ex <pre>
+   *    List("Steve", "Tom", "John", "Bob")
+   *      .sortWith((e1, e2) => (e1 compareTo e2) &lt; 0) =
+   *    List("Bob", "John", "Steve", "Tom")</pre>
+   */
+  def sortWith(lt: (A, A) => Boolean)(implicit m: ClassManifest[A @uncheckedVariance]): This = {
+    // !!! can we supply a default argument to m: ClassManifest ?
+    val arr = toArray
+    java.util.Arrays.sort(arr, Ordering fromLessThan lt)
+    
+    val b = newBuilder
+    for (x <- arr) b += x
     b.result
   }
 

@@ -12,7 +12,7 @@
 package scala.collection
 
 import mutable.{Buffer, ArrayBuffer, ListBuffer}
-import annotation.tailrec
+import annotation.{ tailrec, experimental }
 // import immutable.{List, Nil, ::, Stream}
 
 /** The <code>Iterator</code> object provides various functions for
@@ -360,6 +360,22 @@ trait Iterator[+A] { self =>
       def next() = { skip(); self.next() }
     }
   }
+  
+ /** Returns a new iterator based on the partial function <code>pf</code>,  
+  *  containing pf(x) for all the elements which are defined on pf.
+  *  The order of the elements is preserved.
+  *  @param pf the partial function which filters and maps the iterator.
+  *  @return the new iterator.
+  */
+  @experimental
+  def filterMap[B](pf: PartialFunction[Any, B]): Iterator[B] = {
+    val self = buffered
+    new Iterator[B] {
+      private def skip() = while (self.hasNext && !pf.isDefinedAt(self.head)) self.next()
+      def hasNext = { skip(); self.hasNext }
+      def next() = { skip(); pf(self.next()) }
+    }
+  }
 
   /** Returns an iterator over the longest prefix of this iterator such that
    *  all elements of the result satisfy the predicate <code>p</code>. 
@@ -675,7 +691,7 @@ trait Iterator[+A] { self =>
    *  @param op  The operator to apply
    *  @return  If the iterable is non-empty, the result of the operations as an Option, otherwise None.
    */
-  def reduceLeftOpt[B >: A](op: (B, A) => B): Option[B] = {
+  def reduceLeftOption[B >: A](op: (B, A) => B): Option[B] = {
     if (!hasNext) None else Some(reduceLeft(op))
   }
 
@@ -684,7 +700,7 @@ trait Iterator[+A] { self =>
    *  @param op  The operator to apply
    *  @return  If the iterable is non-empty, the result of the operations as an Option, otherwise None.
    */
-  def reduceRightOpt[B >: A](op: (A, B) => B): Option[B] = {
+  def reduceRightOption[B >: A](op: (A, B) => B): Option[B] = {
     if (!hasNext) None else Some(reduceRight(op))
   }
   
