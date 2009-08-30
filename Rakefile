@@ -3,5 +3,5 @@
 task :default => [:test]
 
 task :test do
-  system("ant") || abort
+  exec "ant"
 end
