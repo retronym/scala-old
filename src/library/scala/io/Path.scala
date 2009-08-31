@@ -146,7 +146,15 @@ class Path private[io] (val jfile: JFile)
   def createFile(): File =
     if (jfile.createNewFile()) new File(jfile)
     else fail("Failed to create new file.")
+    
+  /** Like createDirectory, but does not fail if it already exists. */
+  def ensureDirectory(force: Boolean = true): Directory =
+    if (this.isDirectory) this.toDirectory else createDirectory(force)
 
+  /** This is temporary while I try to unbreak fsc. */
+  def ensureFile(): File =
+    if (this.isFile) this.toFile else createFile()
+  
   // deletions
   def delete() = jfile.delete()
   def deleteIfExists() = if (jfile.exists()) delete() else false
