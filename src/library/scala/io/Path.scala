@@ -34,7 +34,7 @@ import util.Random.nextASCIIString
 
 object Path
 {
-  // not sure whether this will be problematic
+  // not certain these won't be problematic, but looks good so far
   implicit def string2path(s: String): Path = apply(s)
   implicit def jfile2path(jfile: JFile): Path = apply(jfile)
     
@@ -54,11 +54,11 @@ object Path
   def roots: List[Path] = JFile.listRoots().toList map Path.apply
 
   def apply(path: String): Path = apply(new JFile(path))
-  def apply(jfile: JFile): Path = {
+  def apply(jfile: JFile): Path =
     if (jfile.isFile) new File(jfile)
     else if (jfile.isDirectory) new Directory(jfile)
     else new Path(jfile)
-  }
+    
   private[io] def randomPrefix = nextASCIIString(6)
   private[io] def fail(msg: String) = throw FileOperationException(msg)
 }
@@ -125,9 +125,14 @@ class Path private[io] (val jfile: JFile)
   def isDirectory = jfile.isDirectory()
   def isAbsolute = jfile.isAbsolute()
   def isHidden = jfile.isHidden()
+  def isSymlink = parent.isDefined && {    
+    val x = parent.get / name
+    x.normalize != x.toAbsolute
+  }
   
   // Information
   def lastModified = jfile.lastModified()
+  def lastModified_=(time: Long) = jfile setLastModified time // should use setXXX function?
   def length = jfile.length()
   
   // Boolean path comparisons
@@ -137,23 +142,18 @@ class Path private[io] (val jfile: JFile)
   def isFresher(other: Path) = lastModified > other.lastModified
 
   // creations
-  def create(): Boolean = true
-  def createDirectory(force: Boolean = true): Directory = {
+  def createDirectory(force: Boolean = true, failIfExists: Boolean = false): Directory = {
     val res = if (force) jfile.mkdirs() else jfile.mkdir()
-    if (res) new Directory(jfile)
-    else fail("Failed to create new directory.")
+    if (!res && failIfExists && exists) fail("Directory '%s' already exists." format name)
+    else if (isDirectory) toDirectory
+    else new Directory(jfile)
   }
-  def createFile(): File =
-    if (jfile.createNewFile()) new File(jfile)
-    else fail("Failed to create new file.")
-    
-  /** Like createDirectory, but does not fail if it already exists. */
-  def ensureDirectory(force: Boolean = true): Directory =
-    if (this.isDirectory) this.toDirectory else createDirectory(force)
-
-  /** This is temporary while I try to unbreak fsc. */
-  def ensureFile(): File =
-    if (this.isFile) this.toFile else createFile()
+  def createFile(failIfExists: Boolean = false): File = {
+    val res = jfile.createNewFile()
+    if (!res && failIfExists && exists) fail("File '%s' already exists." format name)
+    else if (isFile) toFile
+    else new File(jfile)
+  }
   
   // deletions
   def delete() = jfile.delete()
