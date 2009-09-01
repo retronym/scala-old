@@ -624,11 +624,10 @@ object List extends SequenceFactory[List] {
    *  @return a pair of lists.
    */
   @deprecated("use `Either.separate' instead")
-  def separate[A,B](es: Iterable[Either[A,B]]): (List[A], List[B]) =
-      es.foldRight[(List[A], List[B])]((Nil, Nil)) {
-      case (Left(a), (lefts, rights)) => (a :: lefts, rights)
-      case (Right(b), (lefts, rights)) => (lefts, b :: rights)
-    }
+  def separate[A, B](es: Iterable[Either[A,B]]): (List[A], List[B]) = {
+    val (lefts, rights) = es partition (_.isLeft)
+    (lefts map (_.left.get) toList, rights map (_.right.get) toList)
+  }
 
   /** Converts an iterator to a list.
    *
