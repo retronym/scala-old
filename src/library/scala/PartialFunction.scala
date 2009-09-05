@@ -29,6 +29,16 @@ trait PartialFunction[-A, +B] extends AnyRef with (A => B) {
    *  @return true, iff <code>x</code> is in the domain of this function.
    */
   def isDefinedAt(x: A): Boolean
+  
+  /** If the first argument is in the function's domain, applies it.
+   *  Otherwise, the second argument is returned.
+   *
+   *  @param  x       the value to pass to apply if isDefinedAt == true
+   *  @param  orElse  the code block to execute if isDefinedAt == false
+   *  @return         apply(x) or orElse
+   */
+  def applyOrElse(x: A)(orElse: => B): B =
+    if (this isDefinedAt x) this apply x else orElse
 
   def orElse[A1 <: A, B1 >: B](that: PartialFunction[A1, B1]) : PartialFunction[A1, B1] = 
     new PartialFunction[A1, B1] {
