@@ -83,7 +83,8 @@ class Lexer extends StdLexical with ImplicitConversions {
 
   private def unicodeBlock = hexDigit ~ hexDigit ~ hexDigit ~ hexDigit ^^ {
     case a ~ b ~ c ~ d =>
-      new String(io.UTF8Codec.encode(Integer.parseInt(List(a, b, c, d) mkString "", 16)), "UTF-8")
+      val value = Integer.parseInt(Array(a,b,c,d).mkString, 16)
+      new String(Array(value), 0, 1)
   }
 
   //private def lift[T](f: String => T)(xs: List[Any]): T = f(xs mkString "")
