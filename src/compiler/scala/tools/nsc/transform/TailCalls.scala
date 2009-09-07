@@ -262,8 +262,7 @@ abstract class TailCalls extends Transform
                 val recTpe = receiver.tpe.widen
                 val enclTpe = ctx.currentMethod.enclClass.typeOfThis
                 // make sure the type of 'this' doesn't change through this polymorphic recursive call
-                if (!forMSIL && 
-                    (receiver.tpe.typeParams.isEmpty || 
+                if ((receiver.tpe.typeParams.isEmpty || 
                       (receiver.tpe.widen == ctx.currentMethod.enclClass.typeOfThis))) 
                   rewriteTailCall(fun, receiver :: transformTrees(vargs, mkContext(ctx, false))) 
                 else 
@@ -282,21 +281,16 @@ abstract class TailCalls extends Transform
           
         case Apply(fun, args) =>
           lazy val defaultTree = treeCopy.Apply(tree, fun, transformTrees(args, mkContext(ctx, false)))
-          if (ctx.currentMethod.isFinal && 
-              ctx.tailPos && 
-              isRecursiveCall(fun)) {
-            fun match {
-              case Select(receiver, _) =>
-                if (!forMSIL) 
-                  rewriteTailCall(fun, receiver :: transformTrees(args, mkContext(ctx, false))) 
-                else 
-                  defaultTree
-              case _ => rewriteTailCall(fun, This(currentClass) :: transformTrees(args, mkContext(ctx, false)))
+          if (ctx.currentMethod.isFinal && ctx.tailPos && isRecursiveCall(fun)) {
+            val rec = fun match {
+              case Select(receiver, _)  => receiver
+              case _                    => This(currentClass)
             }
-          } else
+            rewriteTailCall(fun, rec :: transformTrees(args, mkContext(ctx, false)))
+          }
+          else
             defaultTree
             
-
         case Super(qual, mix) =>
           tree
         case This(qual) =>

@@ -289,7 +289,7 @@ trait StdNames {
     val finalize_ = newTermName("finalize")
     val find_ = newTermName("find")
     val flatMap = newTermName("flatMap")
-    val forName = newTermName(if (forMSIL) "GetType" else "forName")
+    val forName = newTermName("forName")
     val foreach = newTermName("foreach")
     val get = newTermName("get")
     val getCause = newTermName("getCause")
@@ -494,7 +494,5 @@ trait StdNames {
     final val Code          = newTermName("scala.reflect.Code")
   }
   
-  lazy val sn: SymbolNames = 
-    if (forMSIL) new MSILNames
-    else new J2SENames
+  lazy val sn: SymbolNames = new J2SENames
 }

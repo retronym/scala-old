@@ -467,7 +467,7 @@ trait Namers { self: Analyzer =>
       val ValDef(mods, name, tpt, _) = vd
       val hasBP = mods.annotations.exists(isAnn(_, "BeanProperty"))
       val hasBoolBP = mods.annotations.exists(isAnn(_, "BooleanBeanProperty"))
-      if ((hasBP || hasBoolBP) && !forMSIL) {
+      if ((hasBP || hasBoolBP)) {
         if (!name(0).isLetter)
           context.error(vd.pos, "`BeanProperty' annotation can be applied "+
                                 "only to fields that start with a letter")

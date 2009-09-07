@@ -450,13 +450,6 @@ abstract class UnCurry extends InfoTransform with TypingTransformers {
         t
       }
 
-      /** A try or synchronized needs to be lifted anyway for MSIL if it contains
-       *  return statements. These are disallowed in the CLR. By lifting
-       *  such returns will be converted to throws.
-       */
-      def shouldBeLiftedAnyway(tree: Tree) = false && // buggy, see #1981
-        forMSIL && lookForReturns.found(tree)
-
       /** Transform tree `t' to { def f = t; f } where `f' is a fresh name
        */
       def liftTree(tree: Tree) = {
@@ -548,8 +541,6 @@ abstract class UnCurry extends InfoTransform with TypingTransformers {
               (fn.symbol.name == nme.assert_ || fn.symbol.name == nme.assume_) &&
               fn.symbol.owner == PredefModule.moduleClass) {
             Literal(()).setPos(tree.pos).setType(UnitClass.tpe)
-          } else if (fn.symbol == Object_synchronized && shouldBeLiftedAnyway(args.head)) {
-            transform(treeCopy.Apply(tree, fn, List(liftTree(args.head))))
           } else {
             withNeedLift(true) {
               val formals = fn.tpe.paramTypes;
@@ -564,7 +555,7 @@ abstract class UnCurry extends InfoTransform with TypingTransformers {
           withNeedLift(true) { super.transform(tree) }
 
         case Try(block, catches, finalizer) =>
-          if (needTryLift || shouldBeLiftedAnyway(tree)) transform(liftTree(tree))
+          if (needTryLift) transform(liftTree(tree))
           else super.transform(tree)
 
         case CaseDef(pat, guard, body) =>

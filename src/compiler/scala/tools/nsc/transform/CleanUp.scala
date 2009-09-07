@@ -33,17 +33,15 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
     // of the modules of the Java box classes
     private val javaBoxClassModule = new HashMap[Symbol, Symbol]
 
-    if (!forMSIL) {
-      javaBoxClassModule(BooleanClass) = getModule("java.lang.Boolean")
-      javaBoxClassModule(ByteClass)    = getModule("java.lang.Byte")
-      javaBoxClassModule(ShortClass)   = getModule("java.lang.Short")
-      javaBoxClassModule(IntClass)     = getModule("java.lang.Integer")
-      javaBoxClassModule(CharClass)    = getModule("java.lang.Character")
-      javaBoxClassModule(LongClass)    = getModule("java.lang.Long")
-      javaBoxClassModule(FloatClass)   = getModule("java.lang.Float")
-      javaBoxClassModule(DoubleClass)  = getModule("java.lang.Double")
-      javaBoxClassModule(UnitClass)    = getModule("java.lang.Void")
-    }
+    javaBoxClassModule(BooleanClass) = getModule("java.lang.Boolean")
+    javaBoxClassModule(ByteClass)    = getModule("java.lang.Byte")
+    javaBoxClassModule(ShortClass)   = getModule("java.lang.Short")
+    javaBoxClassModule(IntClass)     = getModule("java.lang.Integer")
+    javaBoxClassModule(CharClass)    = getModule("java.lang.Character")
+    javaBoxClassModule(LongClass)    = getModule("java.lang.Long")
+    javaBoxClassModule(FloatClass)   = getModule("java.lang.Float")
+    javaBoxClassModule(DoubleClass)  = getModule("java.lang.Double")
+    javaBoxClassModule(UnitClass)    = getModule("java.lang.Void")
 
     private var localTyper: analyzer.Typer = null
     
@@ -288,7 +286,7 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
         
           def isBoxed(sym: Symbol): Boolean =
             ((sym isNonBottomSubClass BoxedNumberClass) ||
-              (!forMSIL && (sym isNonBottomSubClass BoxedCharacterClass)))
+              (sym isNonBottomSubClass BoxedCharacterClass))
           
           val sym = qual.tpe.typeSymbol
           (sym == definitions.ObjectClass) || isBoxed(sym)
@@ -542,32 +540,29 @@ abstract class CleanUp extends Transform with ast.TreeDSL {
        * constructor. */
       case Template(parents, self, body) =>
         localTyper = typer.atOwner(tree, currentClass)
-        if (!forMSIL) {
-          classConstantMeth.clear
-          newDefs.clear
-          newInits.clear
-          var newBody =
-            transformTrees(body)
-          val firstConstructor =
-            treeInfo.firstConstructor(newBody)
-          newBody =
-            transformTrees(newDefs.toList) ::: (
-              for (member <- newBody) yield member match {
-                case thePrimaryConstructor@DefDef(mods, name, tparams, vparamss, tpt, rhs) if (thePrimaryConstructor == firstConstructor) =>
-                  val newRhs = rhs match {
-                    case theRhs@Block(stats, expr) =>
-                      treeCopy.Block(theRhs, transformTrees(newInits.toList) ::: stats, expr)
-                  }
-                  treeCopy.DefDef(thePrimaryConstructor, mods, name, tparams, vparamss, tpt, newRhs)
-                case notThePrimaryConstructor =>
-                  notThePrimaryConstructor
-              }
-            )
-            treeCopy.Template(tree, parents, self, newBody)
-        }
-        else super.transform(tree)
+        classConstantMeth.clear
+        newDefs.clear
+        newInits.clear
+        var newBody =
+          transformTrees(body)
+        val firstConstructor =
+          treeInfo.firstConstructor(newBody)
+        newBody =
+          transformTrees(newDefs.toList) ::: (
+            for (member <- newBody) yield member match {
+              case thePrimaryConstructor@DefDef(mods, name, tparams, vparamss, tpt, rhs) if (thePrimaryConstructor == firstConstructor) =>
+                val newRhs = rhs match {
+                  case theRhs@Block(stats, expr) =>
+                    treeCopy.Block(theRhs, transformTrees(newInits.toList) ::: stats, expr)
+                }
+                treeCopy.DefDef(thePrimaryConstructor, mods, name, tparams, vparamss, tpt, newRhs)
+              case notThePrimaryConstructor =>
+                notThePrimaryConstructor
+            }
+          )
+          treeCopy.Template(tree, parents, self, newBody)
 
-      case Literal(c) if (c.tag == ClassTag) && !forMSIL=>
+      case Literal(c) if (c.tag == ClassTag) =>
         val tpe = c.typeValue
         typedWithPos(tree.pos) {
           if (isValueClass(tpe.typeSymbol) || tpe.typeSymbol == definitions.UnitClass)

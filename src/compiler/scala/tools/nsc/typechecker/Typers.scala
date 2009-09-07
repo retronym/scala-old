@@ -947,14 +947,6 @@ trait Typers { self: Analyzer =>
                 // (13); the condition prevents chains of views 
                 if (settings.debug.value) log("inferring view from "+tree.tpe+" to "+pt)
                 val coercion = inferView(tree, tree.tpe, pt, true)
-                // convert forward views of delegate types into closures wrapped around
-                // the delegate's apply method (the "Invoke" method, which was translated into apply)
-                if (forMSIL && coercion != null && isCorrespondingDelegate(tree.tpe, pt)) {
-                  val meth: Symbol = tree.tpe.member(nme.apply)
-                  if(settings.debug.value)
-                    log("replacing forward delegate view with: " + meth + ":" + meth.tpe)
-                  return typed(Select(tree, meth), mode, pt)
-                }
                 if (coercion != EmptyTree) {
                   if (settings.debug.value) log("inferred view from "+tree.tpe+" to "+pt+" = "+coercion+":"+coercion.tpe)
                   return newTyper(context.makeImplicit(context.reportAmbiguousErrors)).typed(
@@ -1307,7 +1299,7 @@ trait Typers { self: Analyzer =>
           if (mods hasFlag MUTABLE) {
             val setter = getter.setter(value.owner)
             gs.append(setterDef(setter))
-            if (!forMSIL && (value.hasAnnotation(BeanPropertyAttr) ||
+            if ((value.hasAnnotation(BeanPropertyAttr) ||
                  value.hasAnnotation(BooleanBeanPropertyAttr))) {
               val beanSetterName = "set" + name(0).toString.toUpperCase +
                                    name.subName(1, name.length)
@@ -1681,7 +1673,7 @@ trait Typers { self: Analyzer =>
      *  @return     ...
      */
     def typedFunction(fun: Function, mode: Int, pt: Type): Tree = {
-      val codeExpected = !forMSIL && (pt.typeSymbol isNonBottomSubClass CodeClass)
+      val codeExpected = pt.typeSymbol isNonBottomSubClass CodeClass
       
       if (fun.vparams.length > definitions.MaxFunctionArity)
         return errorTree(fun, "implementation restricts functions to " + definitions.MaxFunctionArity + " parameters")
@@ -2106,27 +2098,6 @@ trait Typers { self: Analyzer =>
               def ifPatternSkipFormals(tp: Type) = tp match {
                 case MethodType(_, rtp) if ((mode & PATTERNmode) != 0) => rtp
                 case _ => tp
-              }
-
-              // Replace the Delegate-Chainer methods += and -= with corresponding
-              // + and - calls, which are translated in the code generator into
-              // Combine and Remove
-              if (forMSIL) {
-                fun match {
-                  case Select(qual, name) =>
-                   if (isSubType(qual.tpe, DelegateClass.tpe)
-                      && (name == encode("+=") || name == encode("-=")))
-                     {
-                       val n = if (name == encode("+=")) nme.PLUS else nme.MINUS
-                       val f = Select(qual, n)
-                       // the compiler thinks, the PLUS method takes only one argument,
-                       // but he thinks it's an instance method -> still two ref's on the stack
-                       //  -> translated by backend
-                       val rhs = treeCopy.Apply(tree, f, args)
-                       return typed(Assign(qual, rhs))
-                     }
-                  case _ => ()
-                }
               }
 
               if (fun.symbol == List_apply && args.isEmpty) {
@@ -2882,24 +2853,7 @@ trait Typers { self: Analyzer =>
           else adapt(expr1, mode, functionType(formals map (t => WildcardType), WildcardType))
         case MethodType(formals, _) =>
           if (isFunctionType(pt)) expr1
-          else expr1 match {
-            case Select(qual, name) if (forMSIL && 
-                                        pt != WildcardType && 
-                                        pt != ErrorType && 
-                                        isSubType(pt, DelegateClass.tpe)) =>
-              val scalaCaller = newScalaCaller(pt);
-              addScalaCallerInfo(scalaCaller, expr1.symbol)
-              val n: Name = scalaCaller.name
-              val del = Ident(DelegateClass) setType DelegateClass.tpe
-              val f = Select(del, n)
-              //val f1 = TypeApply(f, List(Ident(pt.symbol) setType pt))
-              val args: List[Tree] = if(expr1.symbol.isStatic) List(Literal(Constant(null)))
-                                     else List(qual) // where the scala-method is located
-              val rhs = Apply(f, args);
-              typed(rhs)
-            case _ => 
-              adapt(expr1, mode, functionType(formals map (t => WildcardType), WildcardType))
-          }
+          else adapt(expr1, mode, functionType(formals map (t => WildcardType), WildcardType))
         case ErrorType =>
           expr1
         case _ =>

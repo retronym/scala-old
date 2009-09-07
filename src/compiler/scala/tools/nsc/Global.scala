@@ -247,9 +247,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   lazy val classPath0 = new ClassPath(false && onlyPresentation)
 
   lazy val classPath =
-    if (forMSIL)
-      new classPath0.Build(settings.sourcepath.value, settings.outdir.value)
-    else
       new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
                            settings.outdir.value, settings.bootclasspath.value,
                            settings.extdirs.value, settings.Xcodebase.value)
@@ -263,10 +260,8 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     set  
   }
                            
-  if (settings.verbose.value) {
+  if (settings.verbose.value)
     inform("[Classpath = " + classPath + "]")
-    if (forMSIL) inform("[AssemRefs = " + settings.assemrefs.value + "]")
-  }
 
   def getSourceFile(f: AbstractFile): BatchSourceFile =
     new BatchSourceFile(f, reader.read(f))
@@ -290,8 +285,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
   } with SymbolLoaders
 
   def rootLoader: LazyType =
-    if (forMSIL) new loaders.NamespaceLoader(classPath.root)
-    else new loaders.PackageLoader(classPath.root /* getRoot() */)
+    new loaders.PackageLoader(classPath.root /* getRoot() */)
 
 // ------------ Phases -------------------------------------------}
 
@@ -600,18 +594,11 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     phasesSet += deadCode			       // optimization: get rid of dead cpde
     phasesSet += terminal                              // The last phase in the compiler chain
 
-    if (! forMSIL) {
-      phasesSet += flatten			       // get rid of inner classes
-    }
-    if (forJVM) {
-      phasesSet += liftcode			       // generate reified trees
-      phasesSet += genJVM			       // generate .class files	   
-      if (settings.make.value != "all")
-        phasesSet += dependencyAnalysis 
-    }
-    if (forMSIL) {					
-      phasesSet += genMSIL			       // generate .msil files
-    }
+    phasesSet += flatten			       // get rid of inner classes
+    phasesSet += liftcode			       // generate reified trees
+    phasesSet += genJVM			       // generate .class files	   
+    if (settings.make.value != "all")
+      phasesSet += dependencyAnalysis 
   }
 
 
@@ -989,8 +976,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     })
   }
 
-  def forJVM : Boolean = settings.target.value startsWith "jvm"
-  def forMSIL: Boolean = settings.target.value == "msil"
   def onlyPresentation = false
   private val unpickleIDEHook0 : (( => Type) => Type) = f => f
   def unpickleIDEHook : (( => Type) => Type) = unpickleIDEHook0

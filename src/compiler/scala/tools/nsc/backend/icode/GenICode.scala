@@ -46,11 +46,7 @@ abstract class GenICode extends SubComponent  {
     val SCALA_ALLREF = REFERENCE(definitions.NullClass)
     val THROWABLE    = REFERENCE(definitions.ThrowableClass)
     
-    val BoxesRunTime_equals = 
-      if (!forMSIL)
-        definitions.getMember(definitions.BoxesRunTimeClass, nme.equals_)
-      else 
-        definitions.getMember(definitions.getClass("scala.runtime.Comparator").linkedModuleOfClass, nme.equals_)
+    val BoxesRunTime_equals = definitions.getMember(definitions.BoxesRunTimeClass, nme.equals_)
 
     override def run {
       scalaPrimitives.init
@@ -1445,7 +1441,7 @@ abstract class GenICode extends SubComponent  {
       def mustUseAnyComparator: Boolean = {
         def isBoxed(sym: Symbol): Boolean =
           ((sym isNonBottomSubClass definitions.BoxedNumberClass) ||
-            (!forMSIL && (sym isNonBottomSubClass definitions.BoxedCharacterClass)))
+            (sym isNonBottomSubClass definitions.BoxedCharacterClass))
 
         val lsym = l.tpe.typeSymbol
         val rsym = r.tpe.typeSymbol

@@ -99,7 +99,7 @@ class Scalac extends MatchingTask {
 
   /** Defines valid values for the <code>target</code> property. */
   object Target extends PermissibleValue {
-    val values = List("jvm-1.5", "msil")
+    val values = List("jvm-1.5")
   }
 
   /** Defines valid values for the <code>deprecation</code> and
@@ -158,11 +158,6 @@ class Scalac extends MatchingTask {
   protected var unchecked: Option[Boolean] = None
   /** Indicates whether compilation errors will fail the build; defaults to true. */
   protected var failonerror: Boolean = true
-
-  // Name of the output assembly (only relevant with -target:msil)
-  protected var assemname: Option[String] = None
-  // List of assemblies referenced by the program (only relevant with -target:msil)
-  protected var assemrefs: Option[String] = None
 
   /** Prints out the files being compiled by the scalac ant task
    *  (not only the number of files). */
