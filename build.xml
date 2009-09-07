@@ -479,6 +479,18 @@ QUICK BUILD (QUICK)
     <touch file="${build-quick.dir}/library.complete" verbose="no"/>
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
+
+  <target name="quick.newlibs" depends="quick.lib" if="libs.msil.outdated">
+    <antcall target="libs.done"/>
+    <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
+    <property name="msil.jar" value="${build-libs.dir}/msil.jar"/>
+  </target>
+
+  <target name="quick.libs" depends="quick.newlibs" unless="libs.msil.outdated">
+    <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
+    <property name="msil.jar" value="${lib.dir}/msil.jar"/>
+  </target>
+
   <target name="quick.pre-comp" depends="quick.libs">
     <uptodate property="quick.comp.available" targetfile="${build-quick.dir}/compiler.complete">
       <srcfiles dir="${src.dir}/compiler"/>
@@ -1313,6 +1325,10 @@ OPTIMISED COMPILER
 
   <target name="optimised.clean">
     <delete dir="${build-optimised.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
+  </target>
+
+  <target name="libs.clean" depends="pack.clean">
+    <delete dir="${build-libs.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
   </target>
 
 <!-- ===========================================================================
