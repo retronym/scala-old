@@ -153,12 +153,6 @@ object scalac extends Command {
     Section("Advanced Options",
       DefinitionList(
         Definition(
-          CmdOption("Xassem", Argument("file")),
-          "Name of the output assembly (only relevant with -target:msil)"),
-        Definition(
-          CmdOption("Xassem-path", Argument("path")),
-          "List of assemblies referenced by the program (only relevant with -target:msil)"),
-        Definition(
           CmdOption("Xcheck-null"),
           "Emit warning on selection of nullable reference"),
         Definition(

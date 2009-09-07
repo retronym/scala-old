@@ -726,7 +726,7 @@ trait ScalacSettings {
   val XO            = BooleanSetting    ("-optimise", "Generates faster bytecode by applying optimisations to the program").withAbbreviation("-optimize")
   val printLate     = BooleanSetting    ("-print", "Print program with all Scala-specific features removed")
   val sourcepath    = StringSetting     ("-sourcepath", "path", "Specify where to find input source files", "")
-  val target        = ChoiceSetting     ("-target", "Specify for which target object files should be built", List("jvm-1.5", "msil"), "jvm-1.5")
+  val target        = ChoiceSetting     ("-target", "Specify for which target object files should be built", List("jvm-1.5"), "jvm-1.5")
   val unchecked     = BooleanSetting    ("-unchecked", "Enable detailed unchecked warnings")
   val uniqid        = BooleanSetting    ("-uniqid", "Print identifiers with unique names for debugging")
   val verbose       = BooleanSetting    ("-verbose", "Output messages about what the compiler is doing")
@@ -736,8 +736,6 @@ trait ScalacSettings {
    * -X "Advanced" settings
    */
   val Xhelp         = BooleanSetting    ("-X", "Print a synopsis of advanced options")
-  val assemname     = StringSetting     ("-Xassem", "file", "Name of the output assembly (only relevant with -target:msil)", "").dependsOn(target, "msil")
-  val assemrefs     = StringSetting     ("-Xassem-path", "path", "List of assemblies referenced by the program (only relevant with -target:msil)", ".").dependsOn(target, "msil")
   val Xchecknull    = BooleanSetting    ("-Xcheck-null", "Emit warning on selection of nullable reference")
   val checkInit     = BooleanSetting    ("-Xcheckinit", "Add runtime checks on field accessors. Uninitialized accesses result in an exception being thrown.")
   val noassertions  = BooleanSetting    ("-Xdisable-assertions", "Generate no assertions and assumptions")

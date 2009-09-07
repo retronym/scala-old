@@ -28,7 +28,6 @@ import transform._
 import backend.icode.{ICodes, GenICode, Checkers}
 import backend.ScalaPrimitives
 import backend.jvm.GenJVM
-import backend.msil.GenMSIL
 import backend.opt.{Inliners, ClosureElimination, DeadCodeElimination}
 import backend.icode.analysis._
 
@@ -250,15 +249,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
       new classPath0.Build(settings.classpath.value, settings.sourcepath.value,
                            settings.outdir.value, settings.bootclasspath.value,
                            settings.extdirs.value, settings.Xcodebase.value)
-  /* .NET's equivalent of a classpath */
-  lazy val assemrefs = {
-    import java.util.{StringTokenizer}
-    val set = new HashSet[File]  
-    val assems = new StringTokenizer(settings.assemrefs.value, File.pathSeparator)
-    while (assems.hasMoreTokens()) 
-      set += new java.io.File(assems.nextToken())
-    set  
-  }
                            
   if (settings.verbose.value)
     inform("[Classpath = " + classPath + "]")
@@ -519,18 +509,11 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsRightAfter = None
   } with DependencyAnalysis
 
-  // phaseName = "msil"
-  object genMSIL extends {
-    val global: Global.this.type = Global.this
-    val runsAfter = List[String]("dce")
-    val runsRightAfter = None
-  } with GenMSIL
-
   // phaseName = "terminal"
   object terminal extends {
     val global: Global.this.type = Global.this
     val phaseName = "terminal"
-    val runsAfter = List[String]("jvm","msil")
+    val runsAfter = List[String]("jvm")
     val runsRightAfter = None
   } with SubComponent {
     private var cache: Option[GlobalPhase] = None

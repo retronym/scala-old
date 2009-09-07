@@ -458,35 +458,6 @@ trait StdNames {
     Boxed += (nme.Double  -> newTermName("java.lang.Double"))
   }
 
-  private class MSILNames extends SymbolNames {
-    final val JavaLang      = newTermName("System")
-    final val Object        = newTermName("System.Object")
-    final val Class         = newTermName("System.Type")
-    final val String        = newTermName("System.String")
-    final val Throwable     = newTermName("System.Exception")
-    final val NPException   = newTermName("System.NullReferenceException")
-    final val ValueType     = newTermName("System.ValueType")
-    final val Serializable  = nme.NOSYMBOL
-    final val BeanProperty  = nme.NOSYMBOL
-    final val BooleanBeanProperty = nme.NOSYMBOL
-    final val Delegate      = newTermName("System.MulticastDelegate")
-    final val IOOBException = newTermName("System.IndexOutOfRangeException")
-    final val Code          = nme.NOSYMBOL
-    final val BoxedNumber   = newTermName("System.IConvertible")
-    final val BoxedCharacter = newTermName("System.IConvertible")
-    final val BoxedBoolean = newTermName("System.IConvertible")
-    final val MethodAsObject = nme.NOSYMBOL // TODO: is there something like Method in MSIL?
-
-    Boxed += (nme.Boolean -> newTermName("System.Boolean"))
-    Boxed += (nme.Byte    -> newTermName("System.Byte"))
-    Boxed += (nme.Char    -> newTermName("System.Char"))
-    Boxed += (nme.Short   -> newTermName("System.Int16"))
-    Boxed += (nme.Int     -> newTermName("System.Int32"))
-    Boxed += (nme.Long    -> newTermName("System.Int64"))
-    Boxed += (nme.Float   -> newTermName("System.Single"))
-    Boxed += (nme.Double  -> newTermName("System.Double"))
-  }
-
   private class J2SENames extends JavaNames {
     final val Serializable  = newTermName("java.io.Serializable")
     final val BeanProperty  = newTermName("scala.reflect.BeanProperty")

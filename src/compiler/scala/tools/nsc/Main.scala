@@ -63,12 +63,6 @@ object Main extends AnyRef with EvalLoop {
       askShutdown
     }
     else {
-      if (command.settings.target.value == "msil") {
-        val libpath = System.getProperty("msil.libpath")
-        if (libpath != null)
-          command.settings.assemrefs.value =
-            command.settings.assemrefs.value + File.pathSeparator + libpath
-      }
       try {
         val compiler = if (command.settings.Yrangepos.value) new interactive.Global(command.settings, reporter)
         else new Global(command.settings, reporter)

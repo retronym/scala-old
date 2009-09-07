@@ -53,8 +53,6 @@ import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
  *    <li>unchecked,</li>
  *    <li>failonerror,</li>
  *    <li>scalacdebugging,</li>
- *    <li>assemname,</li>
- *    <li>assemrefs.</li>
  *  </ul>
  *  <p>
  *    It also takes the following parameters as nested elements:
@@ -366,9 +364,6 @@ class Scalac extends MatchingTask {
    *  @param input The specified flag */
   def setScalacdebugging(input: Boolean) { scalacDebugging = input }
 
-  def setAssemname(input: String) { assemname = Some(input) }
-  def setAssemrefs(input: String) { assemrefs = Some(input) }
-
 /*============================================================================*\
 **                             Properties getters                             **
 \*============================================================================*/
@@ -548,9 +543,6 @@ class Scalac extends MatchingTask {
     if (!deprecation.isEmpty) settings.deprecation.value = deprecation.get
     if (!optimise.isEmpty) settings.XO.value = optimise.get
     if (!unchecked.isEmpty) settings.unchecked.value = unchecked.get
-
-    if (!assemname.isEmpty) settings.assemname.value = assemname.get
-    if (!assemrefs.isEmpty) settings.assemrefs.value = assemrefs.get
 
     log("Scalac params = '" + addParams + "'", Project.MSG_DEBUG)
     settings.parseParams(addParams)

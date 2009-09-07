@@ -115,24 +115,6 @@ abstract class UnCurry extends InfoTransform with TypingTransformers {
     else if (sym.isMethod && sym.hasFlag(JAVA)) uncurry(repeatedToArray(tp))
     else uncurry(tp)
 
-  /** Traverse tree omitting local method definitions.
-   *  If a `return' is encountered, set `returnFound' to true.
-   *  Used for MSIL only.
-   */
-  private object lookForReturns extends Traverser {
-    var returnFound = false
-    override def traverse(tree: Tree): Unit =  tree match {
-      case Return(_) => returnFound = true
-      case DefDef(_, _, _, _, _, _) => ;
-      case _ => super.traverse(tree)
-    }
-    def found(tree: Tree) = {
-      returnFound = false
-      traverse(tree)
-      returnFound
-    }
-  }
-
   class UnCurryTransformer(unit: CompilationUnit) extends TypingTransformer(unit) {
 
     private var needTryLift = false

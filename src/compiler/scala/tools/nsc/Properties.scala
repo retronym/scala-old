@@ -23,5 +23,4 @@ object Properties extends scala.util.PropertiesTrait {
   
   // settings based on System properties
   val envClasspath          = sysprop("env.classpath", null)
-  val msilILasm             = sysprop("msil.ilasm", "")
 }

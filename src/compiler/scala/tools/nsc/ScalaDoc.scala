@@ -37,12 +37,6 @@ object ScalaDoc {
     if (command.settings.version.value)
       reporter.info(null, versionMsg, true)
     else {
-      if (command.settings.target.value == "msil") {
-        val libpath = System.getProperty("msil.libpath")
-        if (libpath != null)
-          command.settings.assemrefs.value =
-            command.settings.assemrefs.value + File.pathSeparator + libpath
-      }
       try {
         object compiler extends Global(command.settings, reporter) {
           override protected def computeInternalPhases() {
