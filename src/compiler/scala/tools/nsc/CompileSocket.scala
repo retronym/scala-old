@@ -14,8 +14,7 @@ import java.security.SecureRandom
 
 import scala.io.{ File, Path, Process }
 import scala.util.control.Exception.catching
-
-// class CompileChannel { }
+import scala.net.Socket
 
 /** This class manages sockets for the fsc offline compiler.  */
 class CompileSocket {
@@ -150,11 +149,12 @@ class CompileSocket {
       if (attempts == 0) {
         error("Unable to establish connection to compilation daemon")
         null
-      } else {
+      } 
+      else {
         val port = if(create) getPort(vmArgs) else pollPort()
         if(port < 0) return null
         val hostAdr = InetAddress.getLocalHost()
-        Socket(hostAdr, port) match {
+        Socket(hostAdr, port).either match {
           case Right(res) =>
             info("[Connected to compilation daemon at port %d]" format port)
             res
@@ -167,6 +167,7 @@ class CompileSocket {
             
             Thread.sleep(100) // delay before retrying
             getsock(attempts - 1)
+        }
       }
     getsock(nAttempts)
   }
@@ -190,10 +191,7 @@ class CompileSocket {
   }
 
   def getSocket(hostName: String, port: Int): Socket =
-    try new Socket(hostName, port) catch {
-      case e @ (_: IOException | _: SecurityException) =>
-        fatal("Unable to establish connection to server %s:%d; exiting".format(hostName, port))
-    }
+    Socket(hostName, port).opt getOrElse fatal("Unable to establish connection to server %s:%d; exiting".format(hostName, port))
 
   def getPassword(port: Int): String = {
     val ff  = portFile(port)

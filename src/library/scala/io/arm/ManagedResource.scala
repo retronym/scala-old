@@ -45,8 +45,8 @@ abstract trait ManagedResourceImpl[+A] extends ManagedHandle
   protected def translate(v: Handle): A
   
   /** How to handle failure. */
-  protected def onFailure: PartialFunction[Throwable, () => Unit] =
-    { case e: Exception => e.printStackTrace() }
+  // protected def onFailure: PartialFunction[Throwable, () => Unit] =
+  //   { case e: Exception => e.printStackTrace() }
 } 
   
 trait ManagedResource[+A] extends ManagedResourceImpl[A]

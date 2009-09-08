@@ -13,13 +13,26 @@ import java.net.{ URL, MalformedURLException }
 import java.net.{ InetAddress, Socket => JSocket }
 import scala.util.control.Exception._
 
+/** A very skeletal only-as-much-as-I-need Socket wrapper.
+ *
+ *  @author    Paul Phillips
+ */
 object Socket
 {
-  def apply(host: String, port: Int): Either[Throwable, Socket] =
-    catching(classOf[IOException], classOf[SecurityException]) either new Socket(host, port)
+  private val socketExceptions = List(classOf[IOException], classOf[SecurityException])
+  
+  class SocketBox(f: () => Socket) {
+    def either: Either[Throwable, Socket] = catching(socketExceptions: _*) either f()
+    def opt: Option[Socket] = catching(socketExceptions: _*) opt f()
+  } 
+  
+  def apply(host: InetAddress, port: Int) = new SocketBox(() => new Socket(new JSocket(host, port)))
+  def apply(host: String, port: Int) = new SocketBox(() => new Socket(new JSocket(host, port)))
 }
 
-class Socket(host: String, port: Int)
-{
-  
+class Socket(jsocket: JSocket) {
+  def getOutputStream() = jsocket.getOutputStream()
+  def getInputStream() = jsocket.getInputStream()
+  def getPort() = jsocket.getPort()
+  def close() = jsocket.close()
 }

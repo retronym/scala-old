@@ -37,7 +37,7 @@ trait PartialFunction[-A, +B] extends AnyRef with (A => B) {
    *  @param  orElse  the code block to execute if isDefinedAt == false
    *  @return         apply(x) or orElse
    */
-  def applyOrElse(x: A)(orElse: => B): B =
+  def applyOrElse[B1 >: B](x: A)(orElse: => B1): B1 =
     if (this isDefinedAt x) this apply x else orElse
 
   def orElse[A1 <: A, B1 >: B](that: PartialFunction[A1, B1]) : PartialFunction[A1, B1] = 
