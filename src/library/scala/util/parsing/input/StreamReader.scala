@@ -50,7 +50,7 @@ sealed class StreamReader(seq: PagedSeq[Char], off: Int, lnum: Int) extends Page
   override def rest: StreamReader =
     if (off == seq.length) this 
     else if (seq(off) == '\n') 
-      new StreamReader(seq.slice(off + 1), 0, lnum + 1)
+      new StreamReader(seq slice (off + 1), 0, lnum + 1)
     else new StreamReader(seq, off + 1, lnum)
 
   private def nextEol = {
@@ -62,7 +62,7 @@ sealed class StreamReader(seq: PagedSeq[Char], off: Int, lnum: Int) extends Page
   override def drop(n: Int): StreamReader = {
     val eolPos = nextEol
     if (eolPos < off + n && eolPos < seq.length)
-      new StreamReader(seq.slice(eolPos + 1), 0, lnum + 1).drop(off + n - (eolPos + 1))
+      new StreamReader(seq slice (eolPos + 1), 0, lnum + 1).drop(off + n - (eolPos + 1))
     else
       new StreamReader(seq, off + n, lnum)
   }

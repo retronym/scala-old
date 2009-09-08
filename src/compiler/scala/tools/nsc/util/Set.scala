@@ -16,8 +16,6 @@ abstract class Set[T <: AnyRef] {
   def addEntry(x: T): Unit
 
   def iterator: Iterator[T]	
-  
-  @deprecated("use `iterator' instead") def elements = iterator
 
   def contains(x: T): Boolean =
     findEntry(x) ne null

@@ -174,18 +174,10 @@ extends collection.Vector[T]
     while (f.end <= s && !f.isLast) f = f.next
     new PagedSeq(more, f, s, e)
   }
-
-  /** the subsequence from index `start' up to the  
-   *  length of the current sequence.
-   */
-  override def slice(start: Int) = slice(start, UndeterminedEnd)
+  def slice(start: Int): PagedSeq[T] = slice(start, UndeterminedEnd)
 
   /** Convert sequence to string */
-  override def toString = {
-    val buf = new StringBuilder
-    for (ch <- PagedSeq.this.iterator) buf append ch
-    buf.toString
-  }
+  override def toString = mkString
 }
 
 

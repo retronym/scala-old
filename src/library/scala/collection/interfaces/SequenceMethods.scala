@@ -45,7 +45,6 @@ trait SequenceMethods[+A, +This <: SequenceTemplate[A, This] with Sequence[A]] e
   def reverse: This
   def reverseIterator: Iterator[A]
   def segmentLength(p: A => Boolean, from: Int): Int
-  def slice(from: Int): Sequence[A]
   def startsWith[B](that: Sequence[B]): Boolean
   def startsWith[B](that: Sequence[B], offset: Int): Boolean
   def union[B >: A, That](that: Sequence[B])(implicit bf: BuilderFactory[B, That, This]): That

@@ -56,9 +56,6 @@ extends Map[A, B]
 
   def iterator: Iterator[(A, B)] = imap.iterator
 
-  @deprecated("use `iterator' instead")
-  override def elements = iterator
-
   override def toList: List[(A, B)] = imap.toList
 
   override def update(key: A, value: B): Unit = { imap = imap.updated(key, value) }
