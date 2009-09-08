@@ -27,7 +27,7 @@ class ElementValidator() extends Function1[Node,Boolean] {
   protected var adecls:       List[AttrDecl]         = _
 
   /** set content model, enabling element validation */
-  def setContentModel(cm:ContentModel) = {
+  def setContentModel(cm: ContentModel) = {
     contentModel = cm; cm match {
       case ELEMENTS(r) =>
         val nfa = ContentModel.Translator.automatonFrom(r, 1)
@@ -79,22 +79,12 @@ class ElementValidator() extends Function1[Node,Boolean] {
       }
       attr
     }
-    val it = md.iterator; while(it.hasNext) {
-      val attr = it.next
-      j = 0
-      find(attr.key) match {
-
-        case null => 
-          //Console.println("exc");
-          exc = fromUndefinedAttribute( attr.key ) :: exc;
-
-        case AttrDecl(_, tpe, DEFAULT(true, fixedValue)) if attr.value.toString != fixedValue => 
-          exc = fromFixedAttribute( attr.key, fixedValue, attr.value.toString) :: exc;
-
-        case s =>
-          //Console.println("s: "+s);
-
-      }
+    for (attr <- md) find(attr.key) match {
+      case null =>
+        exc ::= fromUndefinedAttribute(attr.key)
+      case AttrDecl(_, tpe, DEFAULT(true, fv @ fixedValue)) if attr.value.toString != fixedValue => 
+        exc ::= fromFixedAttribute(attr.key, fv, attr.value.toString)
+      case _  =>
     }
     
     //val missing = ok.toSet(false); FIXME: it doesn't seem to be used anywhere

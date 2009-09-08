@@ -34,10 +34,7 @@ object Attribute {
     else new PrefixedAttribute(pre, key, value, next)
     
   def apply(pre: Option[String], key: String, value: Seq[Node], next: MetaData): Attribute =
-    pre match {
-      case None     => new UnprefixedAttribute(key, value, next)
-      case Some(p)  => new PrefixedAttribute(p, key, value, next)
-    }  
+    apply(pre.orNull, key, value, next)
 }
 
 abstract trait Attribute extends MetaData

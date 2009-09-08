@@ -27,9 +27,7 @@ abstract class DTD {
   def unparsedEntities: Seq[EntityDecl] = Nil
 
   var elem: Map[String, ElemDecl]    = new HashMap[String, ElemDecl]()
-
   var attr: Map[String, AttListDecl] = new HashMap[String, AttListDecl]()
-
   var ent:  Map[String, EntityDecl]  = new HashMap[String, EntityDecl]()
 
   var decls: List[Decl] = Nil

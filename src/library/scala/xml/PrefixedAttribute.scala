@@ -50,8 +50,7 @@ extends Attribute
       (m.asInstanceOf[PrefixedAttribute].pre == pre) &&
       (m.key == key) && (m.value sameElements value))
 
-  def getNamespace(owner: Node) = 
-    owner.getNamespace(pre)
+  def getNamespace(owner: Node) = owner getNamespace pre
 
   /** forwards the call to next (because caller looks for unprefixed attribute */
   def apply(key: String): Seq[Node] = next(key)

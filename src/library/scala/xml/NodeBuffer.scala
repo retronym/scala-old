@@ -11,6 +11,8 @@
 
 package scala.xml
 
+import collection.mutable.ArrayBuffer
+
 /**
  * <p>
  *   This class acts as a Buffer for nodes. If it is used as a sequence
@@ -26,8 +28,8 @@ package scala.xml
  * @author  Burak Emir
  * @version 1.0
  */
-class NodeBuffer extends scala.collection.mutable.ArrayBuffer[Node] {
-
+class NodeBuffer extends ArrayBuffer[Node]
+{
   /**
    * Append given object to this buffer, returns reference on this NodeBuffer 
    * for convenience. Some rules apply: If o is null, it is ignored. If it is 

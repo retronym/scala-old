@@ -19,8 +19,8 @@ package scala.xml
  *  @author  Burak Emir
  *  @version 1.0, 26/04/2005
  */
-class Document extends NodeSeq with pull.XMLEvent {
-
+class Document extends NodeSeq with pull.XMLEvent
+{
   /** An ordered list of child information items, in document
    *  order. The list contains exactly one element information item. The
    *  list also contains one processing instruction information item for

@@ -38,9 +38,7 @@ extends Attribute
   def equals1(m: MetaData) =
     !m.isPrefixed && (m.key == key) && (m.value sameElements value)
 
-  /** returns null */
-  final def getNamespace(owner: Node): String = 
-    null
+  final def getNamespace(owner: Node): String = null
 
   /**
    * Gets value of unqualified (unprefixed) attribute with given key, null if not found

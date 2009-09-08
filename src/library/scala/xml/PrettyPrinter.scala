@@ -25,9 +25,9 @@ import Utility.sbToString
  *  @param width the width to fit the output into
  *  @step  indentation
  */
-class PrettyPrinter( width:Int, step:Int ) {
-
-  class BrokenException() extends java.lang.Exception
+class PrettyPrinter( width:Int, step:Int )
+{
+  class BrokenException() extends Exception
 
   class Item
   case object Break extends Item {

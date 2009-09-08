@@ -116,8 +116,7 @@ abstract class Node extends NodeSeq {
    * Descendant axis (all descendants of this node, not including node itself) 
    * includes all text nodes, element nodes, comments and processing instructions.
    */
-  def descendant: List[Node] =
-    child.toList.flatMap { x => x::x.descendant }
+  def descendant: List[Node] = child.toList flatMap (x => x :: x.descendant)
 
   /**
    * Descendant axis (all descendants of this node, including thisa node) 
@@ -191,11 +190,8 @@ abstract class Node extends NodeSeq {
    * @return   ...
    */
   def nameToString(sb: StringBuilder): StringBuilder = {
-    if (null != prefix) {
-      sb.append(prefix)
-      sb.append(':')
-    }
-    sb.append(label)
+    if (prefix != null) sb append (prefix + ":")
+    sb append label
   }
 
   /**

@@ -6,7 +6,8 @@ package scala.xml
  *  represents parseable character data, which appeared as CDATA sections in the input 
  *  and is to be preserved as CDATA section in the output.
  */
-case class PCData(_data: String) extends Atom[String](_data) {
+case class PCData(_data: String) extends Atom[String](_data)
+{
   /* The following code is a derivative work of scala.xml.Text */
   if (null == data)
     throw new IllegalArgumentException("tried to construct PCData with null")

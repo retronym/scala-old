@@ -24,11 +24,10 @@ class Unparsed(data: String) extends Atom[String](data)
 
   final override def equals(x: Any) = x match {
     case s:String   => s == data
-    case s:Text     => data == s.data
-    case s:Unparsed => data == s.data
     case s:Atom[_]  => data == s.data
-    case _ => false
+    case _          => false
   }
+  override def hashCode() = data.hashCode()
 
   /** returns text, with some characters escaped according to XML spec */
   override def buildString(sb: StringBuilder) = sb append data
