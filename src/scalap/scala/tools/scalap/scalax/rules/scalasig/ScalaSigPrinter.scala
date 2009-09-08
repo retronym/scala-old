@@ -220,8 +220,10 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     indent()
     printModifiers(m)
     if (m.isAccessor) {
-      val indexOfSetter = m.parent.get.children.findIndexOf(x => x.isInstanceOf[MethodSymbol] &&
-                      x.asInstanceOf[MethodSymbol].name == n + "_$eq")
+      val indexOfSetter = m.parent.get.children.indexWhere {
+        case x: MethodSymbol if x.name == n + "_$eq"  => true
+        case _                                        => false
+      }
       print(if (indexOfSetter > 0) "var " else "val ")
     } else {
       print("def ")
@@ -308,10 +310,10 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     })
     case TypeRefType(prefix, symbol, typeArgs) => sep + (symbol.path match {
       case "scala.<repeated>" => flags match {
-        case TypeFlags(true) => toString(typeArgs.first) + "*"
+        case TypeFlags(true) => toString(typeArgs.head) + "*"
         case _ => "scala.Seq" + typeArgString(typeArgs)
       }
-      case "scala.<byname>" => "=> " + toString(typeArgs.first)
+      case "scala.<byname>" => "=> " + toString(typeArgs.head)
       case _ => {
         val path = StringUtil.cutSubstring(symbol.path)(".package") //remove package object reference
         StringUtil.trimStart(processName(path) + typeArgString(typeArgs), "<empty>.")

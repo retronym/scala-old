@@ -67,7 +67,7 @@ object Main {
     val baos = new ByteArrayOutputStream
     val stream = new PrintStream(baos)
     val syms = scalaSig.topLevelClasses ::: scalaSig.topLevelObjects
-    syms.first.parent match {
+    syms.head.parent match {
     //Partial match
       case Some(p) if (p.name != "<empty>") => {
         val path = p.path
