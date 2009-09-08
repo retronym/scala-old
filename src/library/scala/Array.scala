@@ -327,6 +327,65 @@ object Array {
    *  @return  sequence wrapped in an option, if this is a Sequence, otherwise none
    */
   def unapplySeq[A](x: Array[A]): Some[Array[A]] = Some(x)
+
+  /** Create an array containing several copies of an element.
+   *
+   *  @param n    the length of the resulting array
+   *  @param elem the element composing the resulting array
+   *  @return     an array composed of n elements all equal to elem
+   */
+  @deprecated("use `Array.fill' instead")
+  def make[A: ClassManifest](n: Int, elem: A): Array[A] = {
+    val a = new Array[A](n)
+    var i = 0
+    while (i < n) {
+      a(i) = elem
+      i += 1
+    }
+    a
+  }
+
+  /** Create an array containing the values of a given function <code>f</code> 
+   *  over given range <code>[0..n)</code>
+   */
+  @deprecated("use `Array.tabulate' instead")
+  def fromFunction[A: ClassManifest](f: Int => A)(n: Int): Array[A] = {
+    val a = new Array[A](n)
+    var i = 0
+    while (i < n) {
+      a(i) = f(i)
+      i += 1
+    }
+    a
+  }
+  
+  /** Create an array containing the values of a given function <code>f</code> 
+   *  over given range <code>[0..n1, 0..n2)</code>
+   */
+  @deprecated("use `Array.tabulate' instead")
+  def fromFunction[A: ClassManifest](f: (Int, Int) => A)(n1: Int, n2: Int): Array[Array[A]] =
+    fromFunction(i => fromFunction(f(i, _))(n2))(n1)
+  
+  /** Create an array containing the values of a given function <code>f</code> 
+   *  over given range <code>[0..n1, 0..n2, 0..n3)</code>
+   */
+  @deprecated("use `Array.tabulate' instead")
+  def fromFunction[A: ClassManifest](f: (Int, Int, Int) => A)(n1: Int, n2: Int, n3: Int): Array[Array[Array[A]]] = 
+    fromFunction(i => fromFunction(f(i, _, _))(n2, n3))(n1)
+
+  /** Create an array containing the values of a given function <code>f</code> 
+   *  over given range <code>[0..n1, 0..n2, 0..n3, 0..n4)</code>
+   */
+  @deprecated("use `Array.tabulate' instead")
+  def fromFunction[A: ClassManifest](f: (Int, Int, Int, Int) => A)(n1: Int, n2: Int, n3: Int, n4: Int): Array[Array[Array[Array[A]]]] = 
+    fromFunction(i => fromFunction(f(i, _, _, _))(n2, n3, n4))(n1)
+
+  /** Create an array containing the values of a given function <code>f</code> 
+   *  over given range <code>[0..n1, 0..n2, 0..n3, 0..n4, 0..n5)</code>
+   */
+  @deprecated("use `Array.tabulate' instead")
+  def fromFunction[A: ClassManifest](f: (Int, Int, Int, Int, Int) => A)(n1: Int, n2: Int, n3: Int, n4: Int, n5: Int): Array[Array[Array[Array[Array[A]]]]] = 
+    fromFunction(i => fromFunction(f(i, _, _, _, _))(n2, n3, n4, n5))(n1)
 }
 
 /** This class represents polymorphic arrays. <code>Array[T]</code> is Scala's representation
@@ -340,6 +399,62 @@ final class Array[A](_length: Int) extends Vector[A]
                                       with VectorTemplate[A, Array[A]] {
 
   override def companion: Companion[Array] = throw new Error()
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int, dim5: Int) = {
+     this(dim1);
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int, dim5: Int, dim6: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int, dim5: Int, dim6: Int, dim7: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int, dim5: Int, dim6: Int, dim7: Int, dim8: Int) = {
+     this(dim1)
+     throw new Error()
+   }
+
+   /** Multidimensional array creation */
+   @deprecated("use `Array.ofDim' instead")
+   def this(dim1: Int, dim2: Int, dim3: Int, dim4: Int, dim5: Int, dim6: Int, dim7: Int, dim8: Int, dim9: Int) = {
+     this(dim1)
+     throw new Error()
+   }
 
   /** The length of the array */
   def length: Int = throw new Error()
@@ -389,4 +504,62 @@ final class Array[A](_length: Int) extends Vector[A]
    *  prints:    Array(Array(1, 2), Array(3, 4))
    */
   def deep: Vector[Any] = throw new Error()
+
+  /**
+   *  @return a deep string representation of this array.
+   */
+  @deprecated("use deep.toString instead")
+  def deepToString(): String = throw new Error()
+
+  /** <p>
+   *    Returns a string representation of this array object. The resulting string
+   *    begins with the string <code>start</code> and is finished by the string
+   *    <code>end</code>. Inside, the string representations of elements (w.r.t.
+   *    the method <code>deepToString()</code>) are separated by the string
+   *    <code>sep</code>. For example:
+   *  </p>
+   *  <p>
+   *    <code>Array(Array(1, 2), Array(3)).deepMkString("[", "; ", "]") = "[[1; 2]; [3]]"</code>
+   *  </p>
+   *
+   *  @param start starting string.
+   *  @param sep separator string.
+   *  @param end ending string.
+   *  @return a string representation of this array object.
+   */
+  @deprecated("use deep.mkString instead")
+  def deepMkString(start: String, sep: String, end: String): String =
+    throw new Error()
+
+  /** Returns a string representation of this array object. The string
+   *  representations of elements (w.r.t. the method <code>deepToString()</code>)
+   *  are separated by the string <code>sep</code>.
+   *
+   *  @param sep separator string.
+   *  @return a string representation of this array object.
+   */
+  @deprecated("use deep.mkString instead")
+  def deepMkString(sep: String): String = throw new Error()
+
+  /** <p>
+   *    Returns <code>true</code> if the two specified arrays are
+   *    <em>deeply equal</em> to one another.
+   *  </p>
+   *  <p>
+   *    Two array references are considered deeply equal if both are null,
+   *    or if they refer to arrays that contain the same number of elements
+   *    and all corresponding pairs of elements in the two arrays are deeply
+   *    equal.
+   *  </p>
+   *  <p>
+   *    See also method <code>deepEquals</code> in the Java class
+   *    <a href="http://java.sun.com/javase/6/docs/api/java/util/Arrays.html"
+   *    target="_top">java.utils.Arrays</a>
+   *  </p>
+   *
+   *  @param that the second
+   *  @return     <code>true</code> iff both arrays are deeply equal.
+   */
+  @deprecated("use array1.deep.equals(array2.deep) instead")
+  def deepEquals(that: Any): Boolean = throw new Error()
 }
