@@ -422,13 +422,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsRightAfter = None
   } with LambdaLift
 
-  // phaseName = "detach"
-//  object detach extends {
-//    val global: Global.this.type = Global.this
-//    val runsAfter = List("lambdalift")
-//    val runsRightAfter = Some("lambdalift")
-//  } with Detach
-
   // phaseName = "constructors"
   object constructors extends {
     val global: Global.this.type = Global.this
@@ -566,8 +559,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     phasesSet += erasure			       // erase generic types to Java 1.4 types, add interfaces for traits
     phasesSet += lazyVals			       // 
     phasesSet += lambdaLift			       // move nested functions to top level
-//    if (forJVM && settings.Xdetach.value)
-//      phasesSet += detach			       // convert detached closures
     phasesSet += constructors			       // move field definitions into constructors
     phasesSet += mixer				       // do mixin composition
     phasesSet += cleanup			       // some platform-specific cleanups
