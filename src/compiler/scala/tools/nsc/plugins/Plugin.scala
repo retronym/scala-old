@@ -109,7 +109,10 @@ object Plugin
    *  is badly formed.
    */
   def loadFrom(jarfile: Path, loader: ClassLoader): Option[AnyClass] = {
-    val pluginInfo = loadDescription(jarfile).get
+    val pluginInfo = loadDescription(jarfile) getOrElse {
+      println("Warning: no plugin found in %s" format jarfile)
+      return None
+    }
     
     try Some(loader loadClass pluginInfo.classname) catch {
       case _: ClassNotFoundException =>
