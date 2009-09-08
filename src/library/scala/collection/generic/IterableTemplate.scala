@@ -13,6 +13,7 @@ import scala.collection._
 import annotation.unchecked.uncheckedVariance
 
 import scala.util.control.Breaks._
+import scala.annotation.experimental
 // import immutable.Stream // !!!
 
 /** <p>
@@ -35,7 +36,7 @@ import scala.util.control.Breaks._
  *    This trait adds methods <code>iterator</code>, <code>sameElements</code>,
  *    <code>takeRight</code>, <code>dropRight</code> to the methods inherited
  *    from trait <a href="../Traversable.html" target="ContentFrame">
- *    <code>Traversable</code></a>.
+ *    <code>Traversable</code></a>.  Also: `zip`, `zipAll`, `zipWith`, `zipWithIndex`.
  *  </p>
  *
  *  @author Martin Odersky
@@ -190,6 +191,25 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
       b += ((these.next, thatElem))
     while (those.hasNext)
       b += ((thisElem, those.next))
+    b.result
+  }
+  
+  /** Returns a sequence formed from this sequence and another sequence
+   *  by combining corresponding elements and applying the zipFunction
+   *  to each successive pair.  If one of the two iterables is longer than
+   *  the other, its remaining elements are ignored.
+   *  @param   that         The iterable providing the second half of each result pair
+   *  @param   zipFunction  The function to apply to the two elements
+   *  @return               The resulting sequence
+   */
+  @experimental
+  def zipWith[A1 >: A, B, C, That](that: Sequence[B])(zipFunction: (A1, B) => C)(implicit bf: BuilderFactory[C, That, This]): That = {
+    val b = bf(thisCollection)
+    val these = this.iterator
+    val those = that.iterator
+    while (these.hasNext && those.hasNext)
+      b += zipFunction(these.next, those.next)
+      
     b.result
   }
 

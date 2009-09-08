@@ -35,6 +35,7 @@ trait IterableProxyTemplate[+A, +This <: IterableTemplate[A, This] with Iterable
   override def toIterable: Iterable[A] = self.toIterable
   override def zip[A1 >: A, B, That](that: Iterable[B])(implicit bf: BuilderFactory[(A1, B), That, This]): That = self.zip[A1, B, That](that)(bf)
   override def zipAll[B, A1 >: A, That](that: Iterable[B], thisElem: A1, thatElem: B)(implicit bf: BuilderFactory[(A1, B), That, This]): That = self.zipAll(that, thisElem, thatElem)(bf)
+  override def zipWith[A1 >: A, B, C, That](that: Sequence[B])(zipFunction: (A1, B) => C)(implicit bf: BuilderFactory[C, That, This]): That = self.zipWith(that)(zipFunction)(bf)
   override def zipWithIndex[A1 >: A, That](implicit bf: BuilderFactory[(A1, Int), That, This]): That = self.zipWithIndex(bf)
   override def head: A = self.head
   override def takeRight(n: Int): This = self.takeRight(n)

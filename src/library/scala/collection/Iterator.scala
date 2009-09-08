@@ -450,6 +450,13 @@ trait Iterator[+A] { self =>
     def hasNext = self.hasNext && that.hasNext
     def next = (self.next, that.next)
   }
+  /** Like <code>zip</code>, but applies the supplied zipFunction to the
+   *  corresponding elements rather than simply creating a tuple.
+   */	
+  def zipWith[B, C](that: Iterator[B])(zipFunction: (A, B) => C) = new Iterator[C] {
+    def hasNext = self.hasNext && that.hasNext
+    def next = zipFunction(self.next, that.next)
+  }
 
   /** Return a new iterator with a length equal or longer to `len`.
    *  If the current iterator returns fewer than `len` elements

@@ -75,6 +75,9 @@ extends Iterable[A] with IterableTemplate[A, This] with TraversableView[A, Coll]
 //    if (b.isInstanceOf[NoBuilder[_]]) newZipped(that).asInstanceOf[That]
 //    else super.zip[A1, B, That](that)(bf)    
   }
+  
+  override def zipWith[A1 >: A, B, C, That](that: Sequence[B])(zipFunction: (A1, B) => C)(implicit bf: BuilderFactory[C, That, This]): That =
+    (newZipped(that) map { case (x,y) => zipFunction(x,y) }).asInstanceOf[That]
 
   override def zipWithIndex[A1 >: A, That](implicit bf: BuilderFactory[(A1, Int), That, This]): That =
     zip[A1, Int, That](Stream from 0)(bf)

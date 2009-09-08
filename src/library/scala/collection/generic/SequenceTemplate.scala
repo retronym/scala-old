@@ -22,7 +22,7 @@ import generic._
  *  It adds the following methods to class Iterable:
  *   `length`, `lengthCompare`, `apply`, `isDefinedAt`, `segmentLength`, `prefixLength`,
  *   `indexWhere`, `indexOf`, `lastIndexWhere`, `lastIndexOf`, `reverse`, `reverseIterator`,
- *   `startsWith`, `endsWith`, `indexOfSeq`, , `zip`, `zipAll`, `zipWithIndex`.
+ *   `startsWith`, `endsWith`, `indexOfSeq`.
  * 
  *
  *  @author  Martin Odersky
