@@ -49,9 +49,6 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
    *  @return the new iterator
    */
   def iterator: Iterator[A]
-  
-  @deprecated("use `iterator' instead")
-  def elements = iterator
 
   /** Apply a function <code>f</code> to all elements of this
    *  traversable object.
@@ -274,17 +271,5 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
    */
   override def view(from: Int, until: Int) = view.slice(from, until)
 
-  @deprecated("use `head' instead") def first: A = head
-
-  /** <code>None</code> if traversable is empty. */
-  @deprecated("use `headOption' instead") def firstOption: Option[A] = headOption
-
-  @deprecated("use `toSequence' instead") def toSeq: Sequence[A] = toSequence
-
-  /** 
-   * returns a projection that can be used to call non-strict <code>filter</code>,
-   * <code>map</code>, and <code>flatMap</code> methods that build projections
-   * of the collection.
-   */
-  @deprecated("use `view' instead") def projection = view
+  def toSeq: Sequence[A] = toSequence
 }

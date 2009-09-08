@@ -12,17 +12,10 @@
 package scala.collection
 
 import mutable.ListBuffer
-// import immutable.{List, Nil, ::}
 import generic._
-import scala.util.control.Breaks._
 
 /** Class <code>Sequence[A]</code> represents sequences of elements
  *  of type <code>A</code>.
- *  It adds the following methods to class Iterable:
- *   `length`, `lengthCompare`, `apply`, `isDefinedAt`, `segmentLength`, `prefixLength`,
- *   `indexWhere`, `indexOf`, `lastIndexWhere`, `lastIndexOf`, `reverse`, `reverseIterator`,
- *   `startsWith`, `endsWith`, `indexOfSeq`.
- * 
  *
  *  @author  Martin Odersky
  *  @author  Matthias Zenger
@@ -35,18 +28,9 @@ trait Sequence[+A] extends PartialFunction[Int, A]
   override def companion: Companion[Sequence] = Sequence
 }
 
-object Sequence extends SequenceFactory[Sequence] {
-  
+object Sequence extends SequenceFactory[Sequence]
+{
   implicit def builderFactory[A]: BuilderFactory[A, Sequence[A], Coll] = new VirtualBuilderFactory[A]
-  def newBuilder[A]: Builder[A, Sequence[A]] = immutable.Sequence.newBuilder[A]
-  
-  @deprecated("use View instead") type Projection[A] = SequenceView[A, Coll] 
-  
-  @deprecated("use Sequence(value) instead")
-  def singleton[A](value: A) = Sequence(value) 
-
-  /** Builds a singleton sequence. */
-  @deprecated("use <code>Sequence(x)</code> instead.")
-  def single[A](x: A) = singleton(x)
+  def newBuilder[A]: Builder[A, Sequence[A]] = immutable.Sequence.newBuilder[A]  
 }
 
