@@ -1767,7 +1767,7 @@ trait Symbols {
       else rawowner
 
     override def name: Name =
-      if ((rawflags & notDEFERRED) != 0 && phase.devirtualized && !phase.erasedTypes) {
+      if ((rawflags & notDEFERRED) != 0 && !phase.erasedTypes) {
         newTypeName(rawname+"$trait") // (part of DEVIRTUALIZE)
       } else if (phase.flatClasses && rawowner != NoSymbol && !rawowner.isPackageClass) {
         if (flatname == nme.EMPTY) {

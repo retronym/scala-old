@@ -296,8 +296,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     override def erasedTypes: Boolean = isErased
     private val isFlat = prev.name == "flatten" || prev.flatClasses
     override def flatClasses: Boolean = isFlat
-    private val isDevirtualized = prev.name == "devirtualize" || prev.devirtualized
-    override def devirtualized: Boolean = isDevirtualized  // (part of DEVIRTUALIZE)
 
     /** Is current phase cancelled on this unit? */
     def cancelled(unit: CompilationUnit) = 
@@ -356,10 +354,6 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     val runsAfter = List[String]("pickler")
     val runsRightAfter = None
   } with RefChecks
-
-//  object devirtualize extends {
-//    val global: Global.this.type = Global.this
-//  } with DeVirtualize
 
   // phaseName = "liftcode"
   object liftcode extends {
@@ -546,11 +540,7 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
     phasesSet += analyzer.typerFactory                 // consistency check after refchecks would fail.
     phasesSet += superAccessors			       // add super accessors
     phasesSet += pickler			       // serialize symbol tables
-    phasesSet += refchecks			       // perform reference and override checking, translate nested objects
-    
-//    if (false && settings.Xexperimental.value)
-//	phasesSet += devirtualize		       // Desugar virtual classes4
-    
+    phasesSet += refchecks			       // perform reference and override checking, translate nested objects    
     phasesSet += uncurry			       // uncurry, translate function values to anonymous classes
     phasesSet += tailCalls			       // replace tail calls by jumps
     if (settings.specialize.value)

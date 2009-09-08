@@ -699,11 +699,6 @@ trait ScalacSettings {
   
   /** Disable a setting */
   def disable(s: Setting) = allsettings -= s
-  
-  /**
-   *  Temporary Settings
-   */
-  val suppressVTWarn = BooleanSetting    ("-Ysuppress-vt-typer-warnings", "Suppress warnings from the typer when testing the virtual class encoding, NOT FOR FINAL!") 
 
   /** 
    *  Standard settings
