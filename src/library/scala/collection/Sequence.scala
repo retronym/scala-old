@@ -30,6 +30,8 @@ trait Sequence[+A] extends PartialFunction[Int, A]
 
 object Sequence extends SequenceFactory[Sequence]
 {
+  private[collection] val hashSeed = "Sequence".hashCode
+  
   implicit def builderFactory[A]: BuilderFactory[A, Sequence[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, Sequence[A]] = immutable.Sequence.newBuilder[A]  
 }

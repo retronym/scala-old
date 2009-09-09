@@ -296,6 +296,8 @@ trait IterableTemplate[+A, +This <: IterableTemplate[A, This] with Iterable[A]] 
    *  @note view(from, to)  is equivalent to view.slice(from, to)
    */
   override def view(from: Int, until: Int) = view.slice(from, until)
+  
+  protected def anyEq(that: Any) = this eq that.asInstanceOf[AnyRef]
 
   def toSeq: Sequence[A] = toSequence
 }
