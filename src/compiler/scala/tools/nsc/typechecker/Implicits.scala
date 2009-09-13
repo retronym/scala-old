@@ -38,7 +38,6 @@ self: Analyzer =>
   var manifFail = 0L
   var hits = 0
   var misses = 0
-  var uncached = 0
 
   /** Search for an implicit value. See the comment on `result` at the end of class `ImplicitSearch`
    *  for more info how the search is conducted. 
