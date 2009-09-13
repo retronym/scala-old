@@ -22,7 +22,7 @@ trait MutableVectorTemplate[A, +This <: MutableVectorTemplate[A, This] with muta
   /** Creates a view of this iterable @see Iterable.View
    */
   override def view = new MutableVectorView[A, This] { 
-    protected lazy val underlying = self.thisCollection
+    protected lazy val underlying = self.repr
     override def iterator = self.iterator
     override def length = self.length
     override def apply(idx: Int) = self.apply(idx)

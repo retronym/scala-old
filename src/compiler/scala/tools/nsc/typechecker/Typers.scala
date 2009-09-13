@@ -1143,6 +1143,17 @@ trait Typers { self: Analyzer =>
           if (psym hasFlag FINAL) {
             error(parent.pos, "illegal inheritance from final "+psym)
           } 
+          // XXX I think this should issue a sharper warning of some kind like
+          // "change your code now!" as there are material bugs (which will not be fixed)
+          // associated with case class inheritance.
+          if ((context.owner hasFlag CASE) && !phase.erasedTypes) {
+            for (ancestor <- parent.tpe.baseClasses find (_ hasFlag CASE))
+              unit.deprecationWarning(parent.pos, ( 
+                "case class `%s' has case class ancestor `%s'.  This has been deprecated " +
+                "for unduly complicating both usage and implementation.  You should instead " + 
+                "use extractors for pattern matching on non-leaf nodes." ).format(context.owner, ancestor)                
+              )
+          }
           if (psym.isSealed && !phase.erasedTypes) {
             if (context.unit.source.file != psym.sourceFile)
               error(parent.pos, "illegal inheritance from sealed "+psym)
@@ -1412,7 +1423,11 @@ trait Typers { self: Analyzer =>
                 else if (sym1.isSkolem) matches(sym, sym1.deSkolemize)
                 else super[SubstTypeMap].matches(sym, sym1) 
             }
-            subst(tpt1.tpe)
+            // allow defaults on by-name parameters
+            if (sym hasFlag BYNAMEPARAM)
+              if (tpt1.tpe.typeArgs.isEmpty) WildcardType // during erasure tpt1 is Funciton0
+              else subst(tpt1.tpe.typeArgs(0))
+            else subst(tpt1.tpe)
           } else tpt1.tpe
           newTyper(typer1.context.make(vdef, sym)).transformedOrTyped(vdef.rhs, tpt2)
         }
@@ -3216,7 +3231,21 @@ trait Typers { self: Analyzer =>
                   "\npossible cause: maybe a semicolon is missing before `"+decode(name)+"'?"
                  else ""))
           }
-          setError(tree)
+          
+          // Temporary workaround to retain type information for qual so that askTypeCompletion has something to
+          // work with. This appears to work in the context of the IDE, but is incorrect and needs to be
+          // revisited.
+          if (onlyPresentation) {
+            // Nb. this appears to throw away the effects of setError, but some appear to be
+            // retained across the copy.
+            setError(tree)
+            val tree1 = tree match {
+              case Select(_, _) => treeCopy.Select(tree, qual, name)
+              case SelectFromTypeTree(_, _) => treeCopy.SelectFromTypeTree(tree, qual, name)
+            }
+            tree1
+          } else
+            setError(tree)
         } else {
           val tree1 = tree match {
             case Select(_, _) => treeCopy.Select(tree, qual, name)

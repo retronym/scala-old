@@ -11,12 +11,15 @@
 
 package scala
 
+import collection.immutable.StringOps
+import collection.mutable.{StringBuilder, ArrayOps}
+import collection.generic.BuilderFactory
 
 /** The <code>Predef</code> object provides definitions that are
  *  accessible in all Scala compilation units without explicit
  *  qualification.
  */
-object Predef {
+object Predef extends LowPriorityImplicits {
 
   // classOf dummy ------------------------------------------------------
 
@@ -64,7 +67,7 @@ object Predef {
   
   private val P = scala.`package`  // to force scala package object to be seen.
   private val L = scala.collection.immutable.List // to force Nil, :: to be seen.
-  private val S = scala.collection.mutable.StringBuilder // to force StringBuilder to be seen.
+  private val S = StringBuilder // to force StringBuilder to be seen.
   
   val $scope = scala.xml.TopScope
 
@@ -96,22 +99,29 @@ object Predef {
     java.lang.System.exit(status)
     throw new Throwable()
   }
+  
+  import annotation.elidable
+  import annotation.elidable.ASSERTION
 
+  @elidable(ASSERTION)
   def assert(assertion: Boolean) {
     if (!assertion)
       throw new java.lang.AssertionError("assertion failed")
   }
 
+  @elidable(ASSERTION)
   def assert(assertion: Boolean, message: => Any) {
     if (!assertion)
       throw new java.lang.AssertionError("assertion failed: "+ message)
   }
 
+  @elidable(ASSERTION)
   def assume(assumption: Boolean) {
     if (!assumption)
       throw new java.lang.AssertionError("assumption failed")
   }
 
+  @elidable(ASSERTION)
   def assume(assumption: Boolean, message: => Any) {
     if (!assumption)
       throw new java.lang.AssertionError("assumption failed: "+ message)
@@ -171,7 +181,7 @@ object Predef {
   def println() = Console.println()
   def println(x: Any) = Console.println(x)
   def printf(text: String, xs: Any*) = Console.printf(text, xs: _*)
-  def format(text: String, xs: Any*) = stringWrapper(text).format(xs: _*)
+  def format(text: String, xs: Any*) = augmentString(text).format(xs: _*)
 
   def readLine(): String = Console.readLine()
   def readLine(text: String, args: Any*) = Console.readLine(text, args)
@@ -200,9 +210,37 @@ object Predef {
   
   implicit def booleanWrapper(x: Boolean) = new runtime.RichBoolean(x)
 
-  implicit def stringWrapper(x: String) = new runtime.RichString(x)
+  implicit def augmentString(x: String): StringOps = new StringOps(x)
+  implicit def unaugmentString(x: StringOps): String = x.repr
+
+  implicit def stringBuilderFactory: BuilderFactory[Char, String, String] = 
+    new BuilderFactory[Char, String, String] { def apply(from: String) = new StringBuilder }
 
   implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
+
+  implicit def genericAugmentArray[T](xs: Array[T]): ArrayOps[T] = (xs: AnyRef) match { // !!! drop the AnyRef and get unreachable code errors!
+    case x: Array[AnyRef] => augmentArray[AnyRef](x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Int] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Double] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Long] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Float] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Char] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Byte] => augmentArray(x).asInstanceOf[ArrayOps[T]] 
+    case x: Array[Short] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Boolean] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Unit] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+  }
+
+  implicit def augmentArray[T <: AnyRef](xs: Array[T]): ArrayOps[T] = new ArrayOps.ofRef[T](xs.asInstanceOf[Array[AnyRef]])
+  implicit def augmentArray(xs: Array[Int]): ArrayOps[Int] = new ArrayOps.ofInt(xs)
+  implicit def augmentArray(xs: Array[Double]): ArrayOps[Double] = new ArrayOps.ofDouble(xs)
+  implicit def augmentArray(xs: Array[Long]): ArrayOps[Long] = new ArrayOps.ofLong(xs)
+  implicit def augmentArray(xs: Array[Float]): ArrayOps[Float] = new ArrayOps.ofFloat(xs)
+  implicit def augmentArray(xs: Array[Char]): ArrayOps[Char] = new ArrayOps.ofChar(xs)
+  implicit def augmentArray(xs: Array[Byte]): ArrayOps[Byte] = new ArrayOps.ofByte(xs)
+  implicit def augmentArray(xs: Array[Short]): ArrayOps[Short] = new ArrayOps.ofShort(xs)
+  implicit def augmentArray(xs: Array[Boolean]): ArrayOps[Boolean] = new ArrayOps.ofBoolean(xs)
+  implicit def augmentArray(xs: Array[Unit]): ArrayOps[Unit] = new ArrayOps.ofUnit(xs)
 
   implicit def exceptionWrapper(exc: Throwable) = new runtime.RichException(exc)
   
@@ -246,8 +284,7 @@ object Predef {
 
   /** any array projection can be automatically converted into an array */
   //implicit def forceArrayProjection[A](x: Array.Projection[A]): Array[A] = x.force !!! re-enable?
-  /** any random access character seq (including rich string can be converted into a string */
-  implicit def richString2String(x: runtime.RichString): String = if (x eq null) null else x.toString
+
   //implicit def lazyStreamToConsable[A](xs: => Stream[A]) = new runtime.StreamCons(xs)
 
   implicit def seqToCharSequence(xs: collection.Vector[Char]): CharSequence = new CharSequence {

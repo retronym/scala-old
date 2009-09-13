@@ -6,23 +6,19 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: BooleanArrayVector.scala 18572 2009-08-25 14:14:11Z odersky $
+// $Id: RichString.scala 18589 2009-08-27 14:45:35Z odersky $
 
 
-package scala.collection.mutable
-import scala.reflect.ClassManifest
+package scala.collection
+package immutable
 
-@serializable
-final class BooleanArrayVector(val value: Array[Boolean]) extends ArrayVector[Boolean] {
+class StringOps(override val repr: String) extends StringLike[String] {
 
-  def elemManifest = ClassManifest.Boolean
+  override protected[this] def thisCollection: WrappedString = new WrappedString(repr)
+  override protected[this] def toCollection(repr: String): WrappedString = new WrappedString(repr)
 
-  def length: Int = value.length
+  /** Creates a string builder buffer as builder for this class */
+  override protected[this] def newBuilder = new StringBuilder
 
-  def apply(index: Int): Boolean = value(index)
-
-  def update(index: Int, elem: Boolean) {
-    value(index) = elem
-  }
-  def unbox(elemClass: Class[_]): AnyRef = value
-}
+  override def toString = repr
+}  

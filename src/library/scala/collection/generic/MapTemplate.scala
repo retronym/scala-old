@@ -8,9 +8,10 @@
 
 // $Id$
 
-
 package scala.collection.generic
+
 import scala.collection._
+import PartialFunction._
 
 /** <p>
  *    A generic template for maps from keys of type <code>A</code> to values
@@ -237,7 +238,7 @@ self =>
    *  @param elems     the traversable object.
    */
   def ++[B1 >: B](elems: Traversable[(A, B1)]): Map[A, B1] = 
-    ((thisCollection: Map[A, B1]) /: elems) (_ + _)
+    ((repr: Map[A, B1]) /: elems) (_ + _)
 
   /** Adds a number of elements provided by an iterator
    *  and returns a new collection with the added elements.
@@ -245,7 +246,7 @@ self =>
    *  @param iter   the iterator
    */
   def ++[B1 >: B] (iter: Iterator[(A, B1)]): Map[A, B1] = 
-    ((thisCollection: Map[A, B1]) /: iter) (_ + _)
+    ((repr: Map[A, B1]) /: iter) (_ + _)
 
   /** Creates a string representation for this map.
    *
@@ -254,6 +255,17 @@ self =>
   override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder =
     this.iterator.map { case (k, v) => k+" -> "+v }.addString(b, start, sep, end)
 
+  /** Defines the prefix of this object's <code>toString</code> representation.
+   *  !!! todo: remove stringPrefix overrides where possible
+   */
+  override def stringPrefix: String = "Map"
+
+  /** Need to override string, so that it's not the Function1's string that gets mixed in.
+   */
+  override def toString = super[IterableTemplate].toString
+  
+  override def hashCode() = this map (_.hashCode) sum
+  
   /** Compares two maps structurally; i.e. checks if all mappings
    *  contained in this map are also contained in the other map,
    *  and vice versa.
@@ -263,27 +275,22 @@ self =>
    *              same mappings.
    */
   override def equals(that: Any): Boolean = that match {
-    case other: Map[a, b] =>
-      if (this.size == other.size) 
-        try { // can we find a safer way to do this?
-          this forall {
-            case (key, value) => other.get(key.asInstanceOf[a]) match {
-              case None => false
-              case Some(otherval) => value == otherval
-            }
+    case that: Map[b, _] => 
+      (this eq that) ||
+      (that canEqual this) &&
+      (this.size == that.size) && {
+      try {
+        this forall { 
+          case (k, v) => that.get(k.asInstanceOf[b]) match {
+            case Some(`v`) => true
+            case _ => false
           }
-        } catch {
-          case ex: ClassCastException => false
         }
-      else false
-    case _ => false
+      } catch { 
+        case ex: ClassCastException => 
+          println("calss cast "); false 
+      }}
+    case _ =>
+      false
   }
-
-  /** Defines the prefix of this object's <code>toString</code> representation.
-   */
-  override def stringPrefix: String = "Map"
-
-  /** Need to override string, so that it's not the Function1's string that gets mixed in.
-   */
-  override def toString = super[IterableTemplate].toString
 }
