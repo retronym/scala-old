@@ -82,8 +82,15 @@ self: Analyzer =>
    *  @param  subst   A substituter that represents the undetermined type parameters
    *                  that were instantiated by the winning implicit.
    */
-  class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
+  case class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
     override def toString = "SearchResult("+tree+", "+subst+")"
+
+    override def equals(that: Any) = that match {
+      case SearchResult(tree1, subst1) => tree.equalsStructure(tree1) && subst == subst1
+      case _                           => false
+    }
+
+    override def hashCode = 0
   }
 
   lazy val SearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter)
@@ -671,28 +678,6 @@ self: Analyzer =>
       }
     }
 
-    /** Construct a fresh symbol tree for an implicit parameter
-        because of caching, must clone symbols that represent bound variables, 
-        or we will end up with different bound variables that are represented by the same symbol */
-    def freshenFunctionParameters(tree : Tree) : Tree = new Transformer {
-      currentOwner = context.owner
-      override val treeCopy = new LazyTreeCopier
-      override def transform(tr : Tree) = super.transform(tr match {
-        case Function(vparams, body) => {
-          // New tree
-          val sym = tr.symbol cloneSymbol currentOwner
-          val res = tr.duplicate setSymbol sym
-          // New parameter symbols
-          var oldsyms = vparams map (_.symbol)
-          var newsyms = cloneSymbols(oldsyms, sym)
-          // Fix all symbols
-          new TreeSymSubstituter(oldsyms, newsyms) traverse res
-          res
-        }
-        case x => x
-      })
-    } transform tree
-
     /** Return cached search result if found. Otherwise update cache
      *  but keep within sizeLimit entries
      */
@@ -701,17 +686,22 @@ self: Analyzer =>
         hits += 1
         if (sr == SearchFailure) sr
         else {
-          val result = new SearchResult(freshenFunctionParameters(sr.tree.duplicate), sr.subst) // #2201: generate fresh symbols for parameters
+          val result = new SearchResult(sr.tree.duplicate, sr.subst)
           for (t <- result.tree) t.setPos(tree.pos.focus)
           result
         }
       case None => 
         misses += 1
-        val r = searchImplicit(implicitsOfExpectedType, false)
+        val ioet = implicitsOfExpectedType
+        val r = searchImplicit(ioet, false)
         //println("new fact: search implicit of "+key+" = "+r)
-        implicitsCache(key) = r
-        if (implicitsCache.size >= sizeLimit)
-          implicitsCache -= implicitsCache.keysIterator.next
+        def searchWithNoContext = new ImplicitSearch(tree, pt, isView, NoContext).searchImplicit(ioet, false)
+        val cacheable = ioet.flatten.length == 1 && r == searchWithNoContext
+        if (cacheable) {
+          implicitsCache(key) = r
+          if (implicitsCache.size >= sizeLimit)
+            implicitsCache -= implicitsCache.keysIterator.next
+        }
         r
     }
 
