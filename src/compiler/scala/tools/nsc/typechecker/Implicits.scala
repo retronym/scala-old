@@ -82,15 +82,8 @@ self: Analyzer =>
    *  @param  subst   A substituter that represents the undetermined type parameters
    *                  that were instantiated by the winning implicit.
    */
-  case class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
+  class SearchResult(val tree: Tree, val subst: TreeTypeSubstituter) {
     override def toString = "SearchResult("+tree+", "+subst+")"
-
-    override def equals(that: Any) = that match {
-      case SearchResult(tree1, subst1) => tree.equalsStructure(tree1) && subst == subst1
-      case _                           => false
-    }
-
-    override def hashCode = 0
   }
 
   lazy val SearchFailure = new SearchResult(EmptyTree, EmptyTreeTypeSubstituter)
