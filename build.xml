@@ -1296,6 +1296,19 @@ BOOTRAPING TEST AND TEST SUITE
       <scalaptests dir="${test.dir}/files/scalap" includes="**/*.scala"/>
     </partest>
   </target>
+
+  <target name="test.suite.2316" depends="pack.done">
+    <partest showlog="yes" erroronfailed="yes" javacmd="${java.home}/bin/java"
+             timeout="1200000" javaccmd="${javac.cmd}"
+             scalacopts="${scalac.args.optimise}">
+      <classpath>
+        <path refid="pack.classpath"/>
+        <fileset dir="${test.dir}/files/lib" includes="*.jar"/>
+      </classpath>
+      <negtests  dir="${test.dir}/files/neg/bug2316" includes="*.scala"/>
+      <runtests  dir="${test.dir}/files/run/bug2316" includes="*.scala"/>
+    </partest>
+  </target>
   
   <target name="test.done" depends="test.suite, test.stability"/>
 
