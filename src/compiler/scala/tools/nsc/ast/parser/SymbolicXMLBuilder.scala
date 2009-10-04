@@ -2,7 +2,7 @@
  * Copyright 2005-2009 LAMP/EPFL
  * @author Burak Emir
  */
-// $Id: SymbolicXMLBuilder.scala 17756 2009-05-18 14:28:59Z rytz $
+// $Id$
 
 package scala.tools.nsc
 package ast.parser
@@ -218,7 +218,7 @@ abstract class SymbolicXMLBuilder(p: Parsers#Parser, preserveWS: Boolean)
       
       Assign(Ident(_md), New(clazz, LL(attrArgs: _*)))
     }
-
+      
     def handlePrefixedAttribute(pre: String, key: String, value: Tree)  = mkAttributeTree(pre, key, value)
     def handleUnprefixedAttribute(key: String, value: Tree)             = mkAttributeTree(null, key, value)
 

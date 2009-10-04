@@ -6,13 +6,13 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: List.scala 16287 2008-10-18 13:41:36Z nielsen $
 
+package scala.collection
+package immutable
 
-package scala.collection.immutable
-
-import scala.collection.mutable.ListBuffer
-import scala.collection.generic._
+import generic._
+import mutable.{Builder, ListBuffer}
+import annotation.tailrec
 
 /** A class representing an ordered collection of elements of type
  *  <code>a</code>. This class comes with two implementing case
@@ -23,13 +23,13 @@ import scala.collection.generic._
  *  @author  Martin Odersky and others
  *  @version 2.8
  */
-sealed abstract class List[@specialized +A] extends LinearSequence[A] 
+sealed abstract class List[@specialized +A] extends LinearSeq[A] 
                                   with Product 
-                                  with TraversableClass[A, List]
-                                  with LinearSequenceTemplate[A, List[A]] {
-  override def companion: Companion[List] = List
+                                  with GenericTraversableTemplate[A, List]
+                                  with LinearSeqLike[A, List[A]] {
+  override def companion: GenericCompanion[List] = List
 
-  import collection.{Iterable, Traversable, Sequence, Vector}
+  import scala.collection.{Iterable, Traversable, Seq, Vector}
 
   /** Returns true if the list does not contain any elements.
    *  @return <code>true</code>, iff the list is empty.
@@ -102,6 +102,7 @@ sealed abstract class List[@specialized +A] extends LinearSequence[A]
    *  @return  the reversed list of results.
    */
   def reverseMap[B](f: A => B): List[B] = {
+    @tailrec
     def loop(l: List[A], res: List[B]): List[B] = l match {
       case Nil => res
       case head :: tail => loop(tail, f(head) :: res)
@@ -138,7 +139,7 @@ sealed abstract class List[@specialized +A] extends LinearSequence[A]
     loop(this)
   }
 
-  // Overridden methods from IterableTemplate or overloaded variants of such methods
+  // Overridden methods from IterableLike or overloaded variants of such methods
   
   /** Create a new list which contains all elements of this list
    *  followed by all elements of Traversable `that'
@@ -214,6 +215,7 @@ sealed abstract class List[@specialized +A] extends LinearSequence[A]
    *  @return the suffix of length <code>n</code> of the list
    */
   override def takeRight(n: Int): List[A] = {
+    @tailrec
     def loop(lead: List[A], lag: List[A]): List[A] = lead match {
       case Nil => lag
       case _ :: tail => loop(tail, lag.tail)
@@ -266,9 +268,14 @@ sealed abstract class List[@specialized +A] extends LinearSequence[A]
    *  @return  the longest suffix of the list whose first element
    *           does not satisfy the predicate <code>p</code>.
    */
-  override def dropWhile(p: A => Boolean): List[A] =
-    if (isEmpty || !p(head)) this
-    else tail dropWhile p
+  override def dropWhile(p: A => Boolean): List[A] = {
+    @tailrec
+    def loop(xs: List[A]): List[A] =
+      if (xs.isEmpty || !p(xs.head)) xs
+      else loop(xs.tail)
+
+    loop(this)
+  }
 
   /** Returns the longest prefix of the list whose elements all satisfy
    *  the given predicate, and the rest of the list.
@@ -348,7 +355,7 @@ sealed abstract class List[@specialized +A] extends LinearSequence[A]
    *    <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>,
    *    which should be true iff <code>e1</code> is smaller than
    *    <code>e2</code>.
-   *  !!! todo: move sorting to IterableTemplate
+   *  !!! todo: move sorting to IterableLike
    *  </p>
    *
    *  @param lt the comparison function
@@ -437,8 +444,9 @@ case object Nil extends List[Nothing] {
     throw new NoSuchElementException("head of empty list")
   override def tail: List[Nothing] =
     throw new NoSuchElementException("tail of empty list")
+  // Removal of equals method here might lead to an infinite recusion similar to IntMap.equals.
   override def equals(that: Any) = that match {
-    case that1: Sequence[_] => that1.isEmpty
+    case that1: Seq[_] => that1.isEmpty
     case _ => false
   }
 }
@@ -484,9 +492,9 @@ final case class ::[@specialized B](private var hd: B, private[scala] var tl: Li
  *  @author  Martin Odersky
  *  @version 2.8
  */
-object List extends SequenceFactory[List] {
+object List extends SeqFactory[List] {
   
-  import collection.{Iterable, Sequence, Vector}
+  import collection.{Iterable, Seq, Vector}
 
   implicit def builderFactory[A]: BuilderFactory[A, List[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, List[A]] = new ListBuffer[A]

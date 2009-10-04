@@ -1,4 +1,3 @@
-/* TODO: Reintegrate
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2008-2009, David MacIver         **
@@ -7,9 +6,15 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: $
+// $Id$
 
-package scala.collection.immutable
+package scala.collection
+package immutable
+
+// A dummy to fool ant until reintegration.
+class TreeHashMap
+
+/* TODO: Reintegrate
 
 object TreeHashMap {
   private[TreeHashMap] val _empty = new TreeHashMap[Any, Nothing](IntMap.empty[Nothing]);
@@ -35,7 +40,7 @@ object TreeHashMap {
  * 
  * @author David MacIver
  */
-class TreeHashMap[Key, +Value] private (private val underlying : IntMap[AssocMap[Key, Value]]) extends scala.collection.immutable.Map[Key, Value]{
+class TreeHashMap[Key, +Value] private (private val underlying : IntMap[AssocMap[Key, Value]]) extends Map[Key, Value]{
   def iterator : Iterator[(Key, Value)] = new Iterator[(Key, Value)]{
     val assocIt = new AssocMapIterator(AssocMap.empty[Key, Value]);
     val intIterator = underlying.values;

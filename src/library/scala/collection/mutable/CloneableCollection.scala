@@ -9,11 +9,15 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-/** The J2ME version of the library defined this trait with a clone method
- * to substitute for the lack of Object.clone there
+/** The J2ME version of the library defined this trait with a <code>clone</code>
+ *  method to substitute for the lack of <code>Object.clone</code> there.
+ *
+ *  @since 2.6
  */
-@deprecated("use Cloneable instead") trait CloneableCollection {
+@deprecated("use Cloneable instead")
+trait CloneableCollection {
   override def clone(): AnyRef = super.clone()
 }

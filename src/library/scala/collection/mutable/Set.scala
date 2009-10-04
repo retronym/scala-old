@@ -9,9 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
 /** A generic trait for mutable sets. Concrete set implementations
  *  have to provide functionality for the abstract methods in Set:
@@ -24,13 +25,13 @@ import scala.collection.generic._
  *  @author Matthias Zenger
  *  @author Martin Odersky
  *  @version 2.8
+ *  @since   1
  */
 trait Set[A] extends Iterable[A]
-                with collection.Set[A]
-                with SetClass[A, Set]
-                with MutableSetTemplate[A, Set[A]]
-                with Unhashable {
-  override def companion: Companion[Set] = Set
+                with scala.collection.Set[A]
+                with GenericSetTemplate[A, Set]
+                with SetLike[A, Set[A]] {
+  override def companion: GenericCompanion[Set] = Set
 }
                 
 /** The canonical factory methods for <a href="Set.html">mutable sets</a>.

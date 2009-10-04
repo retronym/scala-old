@@ -8,11 +8,17 @@
 
 // $Id$
 
-package scala.collection.immutable
 
-import scala.collection.generic._
+package scala.collection
+package immutable
 
-/** The canonical factory of <a href="TreeMap.html">TreeMap</a>'s. */
+import generic._
+import mutable.Builder
+
+/** The canonical factory of <a href="TreeMap.html">TreeMap</a>'s.
+ *
+ *  @since 1
+ */
 object TreeMap extends ImmutableSortedMapFactory[TreeMap] {
   def empty[A, B](implicit ord: Ordering[A]) = new TreeMap[A, B]()(ord)
   implicit def builderFactory[A, B](implicit ord: Ordering[A]): BuilderFactory[(A, B), TreeMap[A, B], Coll] = new SortedMapBuilderFactory[A, B]
@@ -24,13 +30,14 @@ object TreeMap extends ImmutableSortedMapFactory[TreeMap] {
  *  @author  Erik Stenman
  *  @author  Matthias Zenger
  *  @version 1.1, 03/05/2004
+ *  @since   1
  */
 @serializable
 class TreeMap[A, +B](override val size: Int, t: RedBlack[A]#Tree[B])(implicit val ordering: Ordering[A])
   extends RedBlack[A] 
      with SortedMap[A, B] 
-     with SortedMapTemplate[A, B, TreeMap[A, B]] 
-     with ImmutableMapTemplate[A, B, TreeMap[A, B]] {
+     with SortedMapLike[A, B, TreeMap[A, B]] 
+     with MapLike[A, B, TreeMap[A, B]] {
        
   def isSmaller(x: A, y: A) = ordering.lt(x, y)
 

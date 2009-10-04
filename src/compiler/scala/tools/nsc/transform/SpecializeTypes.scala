@@ -1,3 +1,9 @@
+/* NSC -- new Scala compiler
+ * Copyright 2005-2009 LAMP/EPFL
+ * @author Iulian Dragos
+ */
+// $Id$
+
 package scala.tools.nsc
 package transform
 
@@ -190,8 +196,8 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
     val tvars = if (sym.isClass) env.keySet 
                 else specializedTypeVars(sym.info).intersect(env.keySet)
     val (methparams, others) = tvars.toList.partition(_.owner.isMethod)
-    val tvars1 = methparams.sort(_.name.toString < _.name.toString)
-    val tvars2 = others.sort(_.name.toString < _.name.toString)
+    val tvars1 = methparams.sortWith(_.name.toString < _.name.toString)
+    val tvars2 = others.sortWith(_.name.toString < _.name.toString)
     log("specName(" + sym + ") env " + env)
     specializedName(sym.name, tvars1 map env, tvars2 map env)
   }
@@ -667,7 +673,7 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
 //    println("\tunify \t" + tp1 + "\n\t\t" + tp2)
     (tp1, tp2) match {
     case (TypeRef(_, sym1, _), _) if sym1.hasAnnotation(SpecializedClass) =>
-      if (definitions.isValueType(tp2.typeSymbol))
+      if (definitions.isValueClass(tp2.typeSymbol))
         env + ((sym1, tp2))
       else 
         env
@@ -1036,8 +1042,8 @@ abstract class SpecializeTypes extends InfoTransform with TypingTransformers {
 
       // replace value and type paremeters of the old method with the new ones
       val symSubstituter = new ImplementationAdapter(
-        List.flatten(parameters(target))    ::: origtparams, 
-        List.flatten(vparamss1).map(_.symbol) ::: newtparams)
+        parameters(target).flatten ::: origtparams, 
+        vparamss1.flatten.map(_.symbol) ::: newtparams)
       val adapter = new AdaptSpecializedValues
       val tmp = symSubstituter(adapter(body(target).duplicate))
       tpt.tpe = tpt.tpe.substSym(oldtparams, newtparams)

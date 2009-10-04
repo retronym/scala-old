@@ -1,4 +1,3 @@
-/* TODO: Reintegrate
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
@@ -10,16 +9,17 @@
 // $Id$
 
 
-package scala.collection.mutable
-
+package scala.collection
+package mutable
 
 /** <code>Queue</code> objects implement data structures that allow to
  *  insert and retrieve elements in a first-in-first-out (FIFO) manner.
  *
  *  @author  Matthias Zenger
  *  @version 1.1, 03/05/2004
+ *  @since   1
  */
-trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
+trait QueueProxy[A] extends Queue[A] with Proxy {
 
   def self: Queue[A]
 
@@ -43,7 +43,7 @@ trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
    *
    *  @param  elem        the element to insert
    */
-  override def +=(elem: A): Unit = self += elem
+  override def +=(elem: A): this.type = { self += elem; this }
 
   /** Adds all elements provided by an <code>Iterable</code> object
    *  at the end of the queue. The elements are prepended in the order they
@@ -51,7 +51,10 @@ trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
    *
    *  @param  iter        an iterable object
    */
-  override def ++=(iter: collection.Iterable[A]): Unit = self ++= iter
+  def ++=(iter: scala.collection.Iterable[A]): this.type = {
+    self ++= iter
+    this
+  }
 
   /** Adds all elements provided by an iterator
    *  at the end of the queue. The elements are prepended in the order they
@@ -59,7 +62,10 @@ trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
    *
    *  @param  iter        an iterator
    */
-  override def ++=(it: Iterator[A]): Unit = self ++= it
+  override def ++=(it: Iterator[A]): this.type = {
+    self ++= it
+    this
+  }
 
   /** Adds all elements to the queue.
    *
@@ -90,7 +96,7 @@ trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
    *
    *  @return an iterator over all queue elements.
    */
-  override def iteratoor: Iterator[A] = self.iterator
+  override def iterator: Iterator[A] = self.iterator
 
   /** This method clones the queue.
    *
@@ -100,4 +106,3 @@ trait QueueProxy[A] extends Queue[A] with SeqProxy[A] {
     def self = QueueProxy.this.self.clone()
   }
 }
-*/

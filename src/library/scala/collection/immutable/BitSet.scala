@@ -9,17 +9,20 @@
 // $Id$
 
 
-package scala.collection.immutable
+package scala.collection
+package immutable
 
-import scala.collection.generic._
-import BitSetTemplate.{LogWL, updateArray}
+import generic._
+import BitSetLike.{LogWL, updateArray}
 
 /** A base class for immutable bit sets.
+ *
+ *  @since 1
  */
 @serializable @SerialVersionUID(1611436763290191562L)
 abstract class BitSet extends Set[Int]  
-                         with collection.BitSet 
-                         with BitSetTemplate[BitSet] {
+                         with scala.collection.BitSet 
+                         with BitSetLike[BitSet] {
   override def empty = BitSet.empty
 
   def fromArray(elems: Array[Long]): BitSet = BitSet.fromArray(elems)

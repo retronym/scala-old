@@ -307,8 +307,9 @@ trait Namers { self: Analyzer =>
           ltype = new PolyTypeCompleter(tparams, ltype, tree, sym, context) //@M
           if (sym.isTerm) skolemize(tparams)
         }
-        if ((sym.name == nme.copy || sym.name.startsWith(nme.copy + "$default$")) &&
-            sym.hasFlag(SYNTHETIC)) {
+        def copyIsSynthetic() = sym.owner.info.member(nme.copy).hasFlag(SYNTHETIC)
+        if (sym.name == nme.copy && sym.hasFlag(SYNTHETIC) ||
+            sym.name.startsWith(nme.copy + "$default$") && copyIsSynthetic()){
           // the 'copy' method of case classes needs a special type completer to make bug0054.scala (and others)
           // work. the copy method has to take exactly the same parameter types as the primary constructor.
           setInfo(sym)(mkTypeCompleter(tree)(copySym => {
@@ -338,7 +339,7 @@ trait Namers { self: Analyzer =>
           case tree @ ClassDef(mods, name, tparams, impl) =>
             tree.symbol = enterClassSymbol(tree)
             finishWith(tparams)
-            if ((mods.flags & CASE) != 0) {
+            if ((mods.flags & CASE) != 0L) {
               val m = ensureCompanionObject(tree, caseModuleDef(tree))
               caseClassOfModuleClass(m.moduleClass) = tree
             }
@@ -364,24 +365,24 @@ trait Namers { self: Analyzer =>
             
           case vd @ ValDef(mods, name, tp, rhs) =>
             if ((!context.owner.isClass ||
-                 (mods.flags & (PRIVATE | LOCAL)) == (PRIVATE | LOCAL) ||
+                 (mods.flags & (PRIVATE | LOCAL)) == (PRIVATE | LOCAL).toLong ||
                  name.endsWith(nme.OUTER, nme.OUTER.length) ||
                  context.unit.isJava) && 
-                (mods.flags & LAZY) == 0) {
+                (mods.flags & LAZY) == 0L) {
               tree.symbol = enterInScope(owner.newValue(tree.pos, name)
                 .setFlag(mods.flags))
               finish
             } else {
               // add getter and possibly also setter
               val accflags: Long = ACCESSOR |
-                (if ((mods.flags & MUTABLE) != 0) mods.flags & ~MUTABLE & ~PRESUPER 
+                (if ((mods.flags & MUTABLE) != 0L) mods.flags & ~MUTABLE & ~PRESUPER 
                  else mods.flags & ~PRESUPER | STABLE)
               if (nme.isSetterName(name))
                 context.error(tree.pos, "Names of vals or vars may not end in `_='")
               // .isInstanceOf[..]: probably for (old) IDE hook. is this obsolete?
               val getter = enterAliasMethod(tree, name, accflags, mods)
               setInfo(getter)(namerOf(getter).getterTypeCompleter(vd))
-              if ((mods.flags & MUTABLE) != 0) {
+              if ((mods.flags & MUTABLE) != 0L) {
                 val setter = enterAliasMethod(tree, nme.getterToSetter(name),
                                             accflags & ~STABLE & ~CASEACCESSOR,
                                             mods)
@@ -393,7 +394,7 @@ trait Namers { self: Analyzer =>
                 } else {
                   var vsym =
                     if (!context.owner.isClass) {
-                      assert((mods.flags & LAZY) != 0) // if not a field, it has to be a lazy val
+                      assert((mods.flags & LAZY) != 0L) // if not a field, it has to be a lazy val
                       owner.newValue(tree.pos, name + "$lzy" ).setFlag(mods.flags | MUTABLE)
                     } else {
                       owner.newValue(tree.pos, nme.getterToLocal(name))
@@ -402,7 +403,7 @@ trait Namers { self: Analyzer =>
                     }
                   enterInScope(vsym)
                   setInfo(vsym)(namerOf(vsym).typeCompleter(tree))
-                  if ((mods.flags & LAZY) != 0)
+                  if ((mods.flags & LAZY) != 0L)
                     vsym.setLazyAccessor(getter)
                   vsym
                 }
@@ -418,7 +419,7 @@ trait Namers { self: Analyzer =>
             finishWith(tparams)
           case TypeDef(mods, name, tparams, _) =>
             var flags: Long = mods.flags
-            if ((flags & PARAM) != 0) flags |= DEFERRED
+            if ((flags & PARAM) != 0L) flags |= DEFERRED
             var sym = new TypeSymbol(owner, tree.pos, name).setFlag(flags)
             setPrivateWithin(tree, sym, mods)
             tree.symbol = enterInScope(sym)
@@ -481,8 +482,7 @@ trait Namers { self: Analyzer =>
 
           val getterName = if (hasBoolBP) "is" + beanName
                            else "get" + beanName
-          val getterMods = Modifiers(flags, mods.privateWithin,
-                                     mods.annotations map (_.duplicate))
+          val getterMods = Modifiers(flags, mods.privateWithin, Nil, mods.positions)
           val beanGetterDef = atPos(vd.pos.focus) {
             DefDef(getterMods, getterName, Nil, List(Nil), tpt.duplicate,
                    if (mods hasFlag DEFERRED) EmptyTree
@@ -906,15 +906,20 @@ trait Namers { self: Analyzer =>
 
       addDefaultGetters(meth, vparamss, tparams, overriddenSymbol)
 
-      thisMethodType( 
-        if (tpt.isEmpty) {
+      thisMethodType({
+        val rt = if (tpt.isEmpty) {
           // replace deSkolemized symbols with skolemized ones (for resultPt computed by looking at overridden symbol, right?)
           val pt = resultPt.substSym(tparamSyms, tparams map (_.symbol))
           // compute result type from rhs
           tpt.tpe = widenIfNotFinal(meth, typer.computeType(rhs, pt), pt)
           tpt setPos meth.pos.focus
           tpt.tpe
-        } else typer.typedType(tpt).tpe)
+        } else typer.typedType(tpt).tpe
+        // #2382: return type of default getters are always @uncheckedVariance
+        if (meth.hasFlag(DEFAULTPARAM))
+          rt.withAnnotation(AnnotationInfo(definitions.uncheckedVarianceClass.tpe, List(), List()))
+        else rt
+      })
     }
 
     /**
@@ -989,9 +994,9 @@ trait Namers { self: Analyzer =>
 
             // If the parameter type mentions any type parameter of the method, let the compiler infer the
             // return type of the default getter => allow "def foo[T](x: T = 1)" to compile.
-            // This is better than always inferring the result type, for example in
+            // This is better than always using Wildcard for inferring the result type, for example in
             //    def f(i: Int, m: Int => Int = identity _) = m(i)
-            // if we infer the default's type, we get "Nothing => Nothing", and the default is not usable.
+            // if we use Wildcard as expected, we get "Nothing => Nothing", and the default is not usable.
             val names = deftParams map { case TypeDef(_, name, _, _) => name }
             object subst extends Transformer {
               override def transform(tree: Tree): Tree = tree match {
@@ -1002,8 +1007,8 @@ trait Namers { self: Analyzer =>
               }
               def apply(tree: Tree) = {
                 val r = transform(tree)
-                if (r.find(_.isEmpty).isEmpty) r
-                else TypeTree()
+                if (r.exists(_.isEmpty)) TypeTree()
+                else r
               }
             }
 
@@ -1101,7 +1106,7 @@ trait Namers { self: Analyzer =>
       val annotated = if (sym.isModule) sym.moduleClass else sym
       // typeSig might be called multiple times, e.g. on a ValDef: val, getter, setter
       // parse the annotations only once.
-      if (annotated.rawAnnotations.isEmpty) tree match {
+      if (!annotated.isInitialized) tree match {
         case defn: MemberDef =>
           val ainfos = defn.mods.annotations filter { _ != null } map { ann =>
             // need to be lazy, #1782

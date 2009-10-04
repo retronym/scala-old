@@ -13,6 +13,7 @@ import java.net.{URLClassLoader, URL}
 import java.util.{Timer, TimerTask}
 
 import scala.tools.nsc.{ObjectRunner, GenericRunnerCommand}
+import scala.tools.nsc.io
 
 import scala.actors.{Actor, Exit, TIMEOUT}
 import scala.actors.Actor._
@@ -234,24 +235,32 @@ class Worker(val fileManager: FileManager) extends Actor {
     // check whether there is a ".javaopts" file
     val argsFile = new File(logFile.getParentFile, fileBase+".javaopts")
     val argString = if (argsFile.exists) {
-      NestUI.verbose("argsFile: "+argsFile)
+      NestUI.verbose("Found javaopts file: "+argsFile)
       val fileReader = new FileReader(argsFile)
       val reader = new BufferedReader(fileReader)
       val options = reader.readLine()
       reader.close()
+      NestUI.verbose("Found javaopts file '%s', using options: '%s'".format(argsFile, options))
       options
     } else ""
-    NestUI.verbose("JAVA_OPTS: "+argString)
 
     val cp = System.getProperty("java.class.path", ".")
     NestUI.verbose("java.class.path: "+cp)
 
     def quote(path: String) = "\""+path+"\""
 
+    // Note! As this currently functions, JAVA_OPTS must precede argString
+    // because when an option is repeated to java only the last one wins.
+    // That means until now all the .javaopts files were being ignored because
+    // they all attempt to change options which are also defined in
+    // scalatest.java_opts, leading to debug output like:
+    //
+    // debug: Found javaopts file 'files/shootout/message.scala-2.javaopts', using options: '-Xss32k'
+    // debug: java -Xss32k -Xss2m -Xms256M -Xmx1024M -classpath [...]
     val cmd =
       JAVACMD+
-      " "+argString+
       " "+JAVA_OPTS+
+      " "+argString+
       " -classpath "+outDir+File.pathSeparator+CLASSPATH+
       " -Djava.library.path="+logFile.getParentFile.getAbsolutePath+
       " -Dscalatest.output="+outDir.getAbsolutePath+
@@ -462,32 +471,37 @@ class Worker(val fileManager: FileManager) extends Actor {
             succeeded = false
           }
           if (succeeded) {
+            val consFM = new ConsoleFileManager
+            import consFM.{latestCompFile, latestLibFile, latestActFile,
+                           latestPartestFile}
+            
             NestUI.verbose("compilation of "+file+" succeeded\n")
 
             val libs = new File(fileManager.LIB_DIR)
-            val urls = List((new File(libs, "ScalaCheck.jar")).toURL,
-                            (new File(libs, "ScalaCheckHelper.jar")).toURL)
+            val scalacheckURL = new File(libs, "ScalaCheck.jar") toURL
             val outURL = outDir.getCanonicalFile.toURL
-            val urlArr = (outURL :: urls).toArray
-            NestUI.verbose("loading classes from:")
-            urlArr foreach {url => NestUI.verbose(url.toString)}
-            val loader = new java.net.URLClassLoader(urlArr, fileManager.getClass.getClassLoader)
-
-            (try {
-              Some(Class.forName("ScalaCheckHelper", true, loader))
-            } catch {
-              case se: SecurityException => None
-              case cnfe: ClassNotFoundException => None
-            }) match {
-              case None =>
-                NestUI.verbose("cannot find ScalaCheckHelper class")
-                succeeded = false
-              case Some(clazz) =>
-                val method = clazz.getMethod("passed", Array(classOf[File], classOf[Array[URL]]): _*)
-                val res = method.invoke(null, Array(logFile, urlArr): _*).asInstanceOf[String]
-                NestUI.verbose("ScalaCheck result: "+res)
-                succeeded = res.equals("ok")
-            }
+            val classpath: List[URL] =
+              List(outURL, scalacheckURL, latestCompFile.toURL, latestLibFile.toURL,
+                   latestActFile.toURL, latestPartestFile.toURL).removeDuplicates
+                   
+            // XXX this is a big cut-and-paste mess, but the revamp is coming
+            val logOut    = new FileOutputStream(logFile)
+            val logWriter = new PrintStream(logOut)
+            val oldStdOut = System.out
+            val oldStdErr = System.err
+            System.setOut(logWriter)
+            System.setErr(logWriter)
+            
+            ObjectRunner.run(classpath, "Test", Nil)
+            
+            logWriter.flush()
+            logWriter.close()
+            System.setOut(oldStdOut)
+            System.setErr(oldStdErr)
+                        
+            NestUI.verbose(io.File(logFile).slurp())
+            // obviously this must be improved upon
+            succeeded = io.File(logFile).lines() forall (_ contains " OK")
           }
         })
 

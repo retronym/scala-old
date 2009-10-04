@@ -8,29 +8,36 @@
 
 // $Id$
 
-package scala.collection.immutable
 
-import scala.collection.generic._
-import scala.collection.mutable
+package scala.collection
+package immutable
 
-/** This class implements immutable sets using a hash table.
- * It is optimized for sequential accesses where the last updated table is accessed most often.
- * It supports with reasonable efficiency accesses to previous versions of the table by keeping
- * a change log that's regularly compacted.
- * It needs to synchronize most methods, so it is less suitable for highly concurrent accesses.
+import generic._
+
+/** <p>
+ *    This class implements immutable sets using a hash table.
+ *  </p>
+ *  <p>
+ *    It is optimized for sequential accesses where the last updated table is
+ *    accessed most often. It supports with reasonable efficiency accesses to
+ *    previous versions of the table by keeping a change log that's regularly
+ *    compacted. It needs to synchronize most methods, so it is less suitable
+ *    for highly concurrent accesses.
+ *  </p>
  *
  * @note the builder of a hash set returns specialized representations EmptySet,Set1,..., Set4
  * for sets of size <= 4.
  *
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.3
  */
-@serializable
+@serializable @SerialVersionUID(4020728942921483037L)
 class HashSet[A] extends Set[A] 
-                    with SetClass[A, HashSet]
-                    with SetTemplate[A, HashSet[A]] 
+                    with GenericSetTemplate[A, HashSet]
+                    with SetLike[A, HashSet[A]] 
                     with mutable.FlatHashTable[A] {
-  override def companion: Companion[HashSet] = HashSet
+  override def companion: GenericCompanion[HashSet] = HashSet
 
   protected var later: HashSet[A] = null
   protected var changedElem: A = _
@@ -127,11 +134,12 @@ class HashSet[A] extends Set[A]
   }
 }
 
-/** A factory object for immutable HashSets
-  *
-  *  @author  Martin Odersky
-  *  @version 2.8
-  */
+/** A factory object for immutable HashSets.
+ *
+ *  @author  Martin Odersky
+ *  @version 2.8
+ *  @since   2.3
+ */
 object HashSet extends SetFactory[HashSet] {
   implicit def builderFactory[A]: BuilderFactory[A, HashSet[A], Coll] = setBuilderFactory[A]
   override def empty[A]: HashSet[A] = new HashSet

@@ -36,6 +36,12 @@ trait Symbols {
   /** Used to keep track of the recursion depth on locked symbols */
   private var recursionTable = Map.empty[Symbol, Int]
 
+  private var nextexid = 0
+  private def freshExistentialName() = {
+    nextexid += 1
+    "_"+nextexid
+  }
+
 /*                                 
   type Position;
   def NoPos : Position;
@@ -251,7 +257,20 @@ trait Symbols {
         newValueParameter(owner.pos.focus, freshName()).setFlag(SYNTHETIC).setInfo(tp)
       argtypess map (_.map(param))
     }
-    
+
+    /** Make an existential variable.
+     *  @param name    suffix to be appended to the freshly generated name
+     *                 It's ususally "", except for type variables abstracting
+     *                 over values, where it is ".type".
+     *  @param owner   The owner of the variable
+     *  @param bounds  The variable's bounds
+     */
+    final def newExistential(pos: Position, name: Name): Symbol = 
+      newAbstractType(pos, name.toTypeName).setFlag(EXISTENTIAL)
+
+    final def freshExistential(suffix: String): Symbol = 
+      newExistential(pos, freshExistentialName()+suffix)
+
     /** Synthetic value parameters when parameter symbols are not available.
      *  Calling this method multiple times will re-use the same parameter names.
      */
@@ -306,7 +325,7 @@ trait Symbols {
     // True if the symbol is locked but still below the allowed recursion depth.
     // False otherwise
     def lockOK: Boolean = {
-      ((rawflags & LOCKED) == 0) ||
+      ((rawflags & LOCKED) == 0L) ||
       ((settings.Yrecursion.value != 0) &&
        (recursionTable get this match {
          case Some(n) => (n <= settings.Yrecursion.value)
@@ -315,7 +334,7 @@ trait Symbols {
 
     // Lock a symbol, using the handler if the recursion depth becomes too great.
     def lock(handler: => Unit) = {
-      if ((rawflags & LOCKED) != 0) {
+      if ((rawflags & LOCKED) != 0L) {
         if (settings.Yrecursion.value != 0) {
           recursionTable get this match {
             case Some(n) =>
@@ -336,7 +355,7 @@ trait Symbols {
 
     // Unlock a symbol
     def unlock() = {
-      if ((rawflags & LOCKED) != 0) {
+      if ((rawflags & LOCKED) != 0L) {
         activeLocks -= 1
         rawflags = rawflags & ~LOCKED
         if (settings.Yrecursion.value != 0)
@@ -373,7 +392,7 @@ trait Symbols {
     final def isValueParameter = isTerm && hasFlag(PARAM)
     final def isLocalDummy = isTerm && nme.isLocalDummyName(name)
     final def isMethod = isTerm && hasFlag(METHOD)
-    final def isSourceMethod = isTerm && (flags & (METHOD | STABLE)) == METHOD // ???
+    final def isSourceMethod = isTerm && (flags & (METHOD | STABLE)) == METHOD.toLong // ???
     final def isLabel = isMethod && !hasFlag(ACCESSOR) && hasFlag(LABEL)
     final def isInitializedToDefault = !isType && (getFlag(DEFAULTINIT | ACCESSOR) == (DEFAULTINIT | ACCESSOR))
     final def isClassConstructor = isTerm && (name == nme.CONSTRUCTOR)
@@ -548,7 +567,7 @@ trait Symbols {
 
     /** Is this symbol a sealed class?*/
     final def isSealed: Boolean =
-      isClass && (hasFlag(SEALED) || isUnboxedClass(this))
+      isClass && (hasFlag(SEALED) || isValueClass(this))
 
     /** Is this symbol locally defined? I.e. not accessed from outside `this' instance */
     final def isLocal: Boolean = owner.isTerm
@@ -673,7 +692,7 @@ trait Symbols {
     final def setFlag(mask: Long): this.type = { rawflags = rawflags | mask; this }
     final def resetFlag(mask: Long): this.type = { rawflags = rawflags & ~mask; this }
     final def getFlag(mask: Long): Long = flags & mask
-    final def hasFlag(mask: Long): Boolean = (flags & mask) != 0
+    final def hasFlag(mask: Long): Boolean = (flags & mask) != 0L
     final def resetFlags { rawflags = rawflags & TopLevelCreationFlags }
 
     /** The class or term up to which this symbol is accessible,
@@ -1729,9 +1748,10 @@ trait Symbols {
     }
     override def unpackLocation = origin
     override def typeParams = info.typeParams //@M! (not deSkolemize.typeParams!!), also can't leave superclass definition: use info, not rawInfo
-    override def cloneSymbolImpl(owner: Symbol): Symbol = {
-      throw new Error("should not clone a type skolem")
-    }
+
+    override def cloneSymbolImpl(owner: Symbol): Symbol =
+      new TypeSkolem(owner, pos, name, origin)
+
     override def nameString: String = 
       if (settings.debug.value) (super.nameString + "&" + level)
       else super.nameString
@@ -1777,7 +1797,7 @@ trait Symbols {
       else rawowner
 
     override def name: Name =
-      if ((rawflags & notDEFERRED) != 0 && phase.devirtualized && !phase.erasedTypes) {
+      if ((rawflags & notDEFERRED) != 0L && phase.devirtualized && !phase.erasedTypes) {
         newTypeName(rawname+"$trait") // (part of DEVIRTUALIZE)
       } else if (phase.flatClasses && rawowner != NoSymbol && !rawowner.isPackageClass) {
         if (flatname == nme.EMPTY) {
@@ -1806,7 +1826,7 @@ trait Symbols {
     /** the self type of an object foo is foo.type, not class<foo>.this.type
      */
     override def typeOfThis: Type =
-      if (getFlag(MODULE | IMPLCLASS) == MODULE && owner != NoSymbol)
+      if (getFlag(MODULE | IMPLCLASS) == MODULE.toLong && owner != NoSymbol)
         singleType(owner.thisType, sourceModule)
       else thissym.tpe
 

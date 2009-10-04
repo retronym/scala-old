@@ -6,7 +6,7 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: BufferedIterator.scala 12641 2007-08-22 16:01:57Z mcdirmid $
+// $Id$
 
 
 package scala.collection
@@ -16,6 +16,7 @@ package scala.collection
  *
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait BufferedIterator[+A] extends Iterator[A] {
 

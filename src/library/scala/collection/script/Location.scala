@@ -9,7 +9,8 @@
 // $Id$
 
 
-package scala.collection.script
+package scala.collection
+package script
 
 
 /** Class <code>Location</code> describes locations in messages implemented by
@@ -17,6 +18,7 @@ package scala.collection.script
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 10/05/2004
+ *  @since   2.8
  */
 
 sealed abstract class Location

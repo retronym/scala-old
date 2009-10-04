@@ -5,8 +5,12 @@
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
-package scala.collection.mutable
+package scala.collection
+package mutable
 
+/**
+ * @since 2.8
+ */
 trait HashEntry [A, E] {
   val key: A
   var next: E = _

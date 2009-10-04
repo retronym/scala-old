@@ -1,4 +1,3 @@
-/* TODO: Reintegrate
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
@@ -9,9 +8,8 @@
 
 // $Id$
 
-
-package scala.collection.mutable
-
+package scala.collection
+package mutable
 
 /** This class implements priority queues using a heap. The
  *  elements of the queue have to be ordered in terms of the
@@ -19,9 +17,10 @@ package scala.collection.mutable
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 03/05/2004
+ *  @since   1
  */
-abstract class PriorityQueueProxy[A <% Ordered[A]] extends PriorityQueue[A]
-         with RandomAccessSeqProxy[A]
+abstract class PriorityQueueProxy[A](implicit ord: Ordering[A]) extends PriorityQueue[A]
+         with Proxy
 {
 
   def self: PriorityQueue[A]
@@ -47,20 +46,26 @@ abstract class PriorityQueueProxy[A <% Ordered[A]] extends PriorityQueue[A]
    *
    *  @param  elem        the element to insert
    */
-  override def +=(elem: A): Unit = self += elem
+  override def +=(elem: A): this.type = { self += elem; this }
 
   /** Adds all elements provided by an <code>Iterable</code> object
    *  into the priority queue.
    *
    *  @param  iter        an iterable object
    */
-  override def ++=(iter: collection.Iterable[A]): Unit = self ++= iter
+  def ++=(iter: scala.collection.Iterable[A]): this.type = {
+    self ++= iter
+    this
+  }
 
   /** Adds all elements provided by an iterator into the priority queue.
    *
    *  @param  it        an iterator
    */
-  override def ++=(it: Iterator[A]): Unit = self ++= it
+  override def ++=(it: Iterator[A]): this.type = {
+    self ++= it
+    this
+  }
 
   /** Adds all elements to the queue.
    *
@@ -99,4 +104,3 @@ abstract class PriorityQueueProxy[A <% Ordered[A]] extends PriorityQueue[A]
     def self = PriorityQueueProxy.this.self.clone()
   }
 }
-*/

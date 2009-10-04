@@ -1,3 +1,12 @@
+/*     ___ ____ ___   __   ___   ___
+**    / _// __// _ | / /  / _ | / _ \    Scala classfile decoder
+**  __\ \/ /__/ __ |/ /__/ __ |/ ___/    (c) 2003-2009, LAMP/EPFL
+** /____/\___/_/ |_/____/_/ |_/_/        http://scala-lang.org/
+**
+*/
+
+// $Id$
+
 package scala.tools.scalap
 package scalax
 package rules
@@ -237,7 +246,7 @@ object ScalaSigEntryParsers extends RulesWithState with MemoisableRules {
 
   lazy val literal = oneOf(
       24 -^ (),
-      25 -~ longValue ^^ (_ != 0),
+      25 -~ longValue ^^ (_ != 0L),
       26 -~ longValue ^^ (_.asInstanceOf[Byte]),
       27 -~ longValue ^^ (_.asInstanceOf[Short]),
       28 -~ longValue ^^ (_.asInstanceOf[Char]),

@@ -6,14 +6,17 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection.interfaces
+package scala.collection
+package interfaces
 
-import scala.collection._
 import generic._
 import mutable.Buffer
 import scala.reflect.ClassManifest
 
-trait TraversableMethods[+A, +This <: TraversableTemplate[A, This] with Traversable[A]]
+/**
+ * @since 2.8
+ */
+trait TraversableMethods[+A, +This <: TraversableLike[A, This] with Traversable[A]]
 {
   // abstract
   def foreach[U](f: A => U): Unit
@@ -34,7 +37,7 @@ trait TraversableMethods[+A, +This <: TraversableTemplate[A, This] with Traversa
   def toArray[B >: A : ClassManifest]: Array[B]
   def toIterable: Iterable[A]
   def toList: List[A]
-  def toSequence: Sequence[A]
+  def toSeq: Seq[A]
   def toSet[B >: A]: immutable.Set[B]
   def toStream: Stream[A]
   def toVector[B >: A]: mutable.Vector[B]

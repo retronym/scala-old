@@ -105,14 +105,17 @@ class Settings(errorFn: String => Unit) extends ScalacSettings {
     ): Option[List[String]] =
       lookupSetting(cmd) match {
         case None       => errorFn("Parameter '" + cmd + "' is not recognised by Scalac.") ; None
-        case Some(cmd)  => setter(cmd)(args)
+        case Some(cmd)  =>
+          val res = setter(cmd)(args)
+          cmd.postSetHook()
+          res
       }
     
     // if arg is of form -Xfoo:bar,baz,quux
     def parseColonArg(s: String): Option[List[String]] = {
       val idx = s indexWhere (_ == ':')
       val (p, args) = (s.substring(0, idx), s.substring(idx+1).split(",").toList)
-      
+
       // any non-Nil return value means failure and we return s unmodified
       tryToSetIfExists(p, args, (s: Setting) => s.tryToSetColon _)
     }
@@ -133,37 +136,39 @@ class Settings(errorFn: String => Unit) extends ScalacSettings {
             
     def doArgs(args: List[String]): List[String] = {
       if (args.isEmpty) return Nil
-      val p = args.head
-      if (p == "") return args.tail // it looks like ant passes "" sometimes
-      
-      if (!p.startsWith("-")) {
-        errorFn("Parameter '" + p + "' does not start with '-'.")
-        return args
+      val arg :: rest = args
+      if (arg == "") {
+        // it looks like Ant passes "" sometimes
+        rest
       }
-      else if (p == "-") {
+      else if (!arg.startsWith("-")) {
+        errorFn("Argument '" + arg + "' does not start with '-'.")
+        args
+      }
+      else if (arg == "-") {
         errorFn("'-' is not a valid argument.")
-        return args
+        args
       }
-      
-      // we dispatch differently based on the appearance of p:
-      // 1) If it has a : it is presumed to be -Xfoo:bar,baz
-      // 2) If the first two chars are the name of a command, -Dfoo=bar
-      // 3) Otherwise, the whole string should be a command name
-      //
-      // Internally we use Option[List[String]] to discover error,
-      // but the outside expects our arguments back unchanged on failure
-      if (p contains ":") parseColonArg(p) match {
-        case Some(_)  => args.tail
-        case None     => args
-      }
-      else if (isPropertyArg(p)) parsePropertyArg(p) match {
-        case Some(_)  => args.tail
-        case None     => args
-      }
-      else parseNormalArg(p, args.tail) match {
-        case Some(xs) => xs
-        case None     => args
-      }
+      else
+        // we dispatch differently based on the appearance of p:
+        // 1) If it has a : it is presumed to be -Xfoo:bar,baz
+        // 2) If the first two chars are the name of a command, -Dfoo=bar
+        // 3) Otherwise, the whole string should be a command name
+        //
+        // Internally we use Option[List[String]] to discover error,
+        // but the outside expects our arguments back unchanged on failure
+        if (arg contains ":") parseColonArg(arg) match {
+          case Some(_)  => rest
+          case None     => args
+        }
+        else if (isPropertyArg(arg)) parsePropertyArg(arg) match {
+          case Some(_)  => rest
+          case None     => args
+        }
+        else parseNormalArg(arg, rest) match {
+          case Some(xs) => xs
+          case None     => args
+        }
     }
 
     doArgs(args)
@@ -357,6 +362,12 @@ object Settings {
     private[Settings] def setErrorHandler(e: String => Unit) = _errorFn = e
     def errorFn(msg: String) = _errorFn(msg)
     def errorAndValue[T](msg: String, x: T): T = { errorFn(msg) ; x }
+    
+    /** Will be called after this Setting is set, for any cases where the
+     *  Setting wants to perform extra work. */
+    private var _postSetHook: () => Unit = () => ()
+    def postSetHook(): Unit = _postSetHook()
+    def withPostSetHook(f: () => Unit): this.type = { _postSetHook = f ; this }
 
     /** After correct Setting has been selected, tryToSet is called with the
      *  remainder of the command line.  It consumes any applicable arguments and
@@ -807,6 +818,8 @@ trait ScalacSettings {
                                           withHelpSyntax("-Ysqueeze:<enabled>") 
   val Ystatistics   = BooleanSetting    ("-Ystatistics", "Print compiler statistics")
   val stop          = PhasesSetting     ("-Ystop", "Stop after phase")
+  val logEquality   = BooleanSetting    ("-Ylog-equality", "Log all noteworthy equality tests (hardcoded to /tmp/scala-equality-log.txt)") .
+                        withPostSetHook(() => scala.runtime.Equality.logEverything = true)
   val refinementMethodDispatch =
                       ChoiceSetting     ("-Ystruct-dispatch", "Selects dispatch method for structural refinement method calls",
                         List("no-cache", "mono-cache", "poly-cache", "invoke-dynamic"), "poly-cache") .
@@ -816,6 +829,7 @@ trait ScalacSettings {
   val Yrangepos     = BooleanSetting    ("-Yrangepos", "Use range positions for syntax trees.")
   val Yidedebug     = BooleanSetting    ("-Yide-debug", "Generate, validate and output trees using the interactive compiler.")
   val Ytyperdebug   = BooleanSetting    ("-Ytyper-debug", "Trace all type assignements")
+  val Ypmatdebug    = BooleanSetting    ("-Ypmat-debug", "Trace all pattern matcher activity.")
   
   /**
    * -P "Plugin" settings

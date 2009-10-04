@@ -1,7 +1,7 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
-**  __\ \/ /__/ __ |/ /__/ __ |                                         **
+**  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
@@ -9,7 +9,8 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
 
 /** <code>Subscriber[A, B]</code> objects may subscribe to events of
@@ -19,6 +20,7 @@ package scala.collection.mutable
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 08/07/2003
+ *  @since   1
  */
 trait Subscriber[-A, -B] {
   def notify(pub: B, event: A): Unit

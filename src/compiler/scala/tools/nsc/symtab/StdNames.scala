@@ -51,6 +51,7 @@ trait StdNames {
     val THROWkw = newTermName("throw")
     val TRAITkw = newTermName("trait")
     val TRUEkw = newTermName("true")
+    val TYPE_ = newTermName("TYPE")
     val TRYkw = newTermName("try")
     val TYPEkw = newTermName("type")
     val VALkw = newTermName("val")
@@ -112,7 +113,7 @@ trait StdNames {
            '|' | '\\'| '/' => true
       case _ =>
         val chtp = Character.getType(c)
-        chtp == Character.MATH_SYMBOL || chtp == Character.OTHER_SYMBOL
+        chtp == Character.MATH_SYMBOL.toInt || chtp == Character.OTHER_SYMBOL.toInt
       }
 
     /** If `name' is an expandedName name, the original name. 
@@ -196,6 +197,7 @@ trait StdNames {
     val ROOT = newTermName("<root>")
     val ROOTPKG = newTermName("_root_")
     val REPEATED_PARAM_CLASS_NAME = newTermName("<repeated>")
+    val JAVA_REPEATED_PARAM_CLASS_NAME = newTermName("<repeated...>")
     val BYNAME_PARAM_CLASS_NAME = newTermName("<byname>")
     val EQUALS_PATTERN_NAME = newTermName("<equals>")
     val SELF = newTermName("$this")
@@ -311,6 +313,7 @@ trait StdNames {
     val map = newTermName("map")
     val Mutable = newTypeName("Mutable")
     val ne = newTermName("ne")
+    val newArray = newTermName("newArray")
     val next = newTermName("next")
     val notify_ = newTermName("notify")
     val notifyAll_ = newTermName("notifyAll")
@@ -328,7 +331,7 @@ trait StdNames {
     val tail = newTermName("tail")
     val toArray = newTermName("toArray")
     val toList = newTermName("toList")
-    val toSequence = newTermName("toSequence")
+    val toSeq = newTermName("toSeq")
     val toString_ = newTermName("toString")
     val clone_ = newTermName("clone")
     val this_ = newTermName("this")
@@ -445,17 +448,24 @@ trait StdNames {
     final val IOOBException = newTermName("java.lang.IndexOutOfBoundsException")
     final val BoxedNumber   = newTermName("java.lang.Number")
     final val BoxedCharacter = newTermName("java.lang.Character")
-    final val BoxedBoolean = newTermName("java.lang.Boolean")
+    final val BoxedBoolean  = newTermName("java.lang.Boolean")
+    final val BoxedByte     = newTermName("java.lang.Byte")
+    final val BoxedShort    = newTermName("java.lang.Short")
+    final val BoxedInteger  = newTermName("java.lang.Integer")
+    final val BoxedLong     = newTermName("java.lang.Long")
+    final val BoxedFloat    = newTermName("java.lang.Float")
+    final val BoxedDouble   = newTermName("java.lang.Double")    
+    
     final val MethodAsObject = newTermName("java.lang.reflect.Method")
 
-    Boxed += (nme.Boolean -> newTermName("java.lang.Boolean"))
-    Boxed += (nme.Byte    -> newTermName("java.lang.Byte"))
-    Boxed += (nme.Char    -> newTermName("java.lang.Character"))
-    Boxed += (nme.Short   -> newTermName("java.lang.Short"))
-    Boxed += (nme.Int     -> newTermName("java.lang.Integer"))
-    Boxed += (nme.Long    -> newTermName("java.lang.Long"))
-    Boxed += (nme.Float   -> newTermName("java.lang.Float"))
-    Boxed += (nme.Double  -> newTermName("java.lang.Double"))
+    Boxed += (nme.Boolean -> BoxedBoolean)
+    Boxed += (nme.Byte    -> BoxedByte)
+    Boxed += (nme.Char    -> BoxedCharacter)
+    Boxed += (nme.Short   -> BoxedShort)
+    Boxed += (nme.Int     -> BoxedInteger)
+    Boxed += (nme.Long    -> BoxedLong)
+    Boxed += (nme.Float   -> BoxedFloat)
+    Boxed += (nme.Double  -> BoxedDouble)
   }
 
   private class MSILNames extends SymbolNames {

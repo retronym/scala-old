@@ -9,13 +9,17 @@
 // $Id$
 
 
-package scala.collection.immutable
+package scala.collection
+package immutable
 
-import scala.collection.generic._
+import generic._
 
+/**
+ * @since 1
+ */
 trait Map[A, +B] extends Iterable[(A, B)] 
-                    with collection.Map[A, B] 
-                    with ImmutableMapTemplate[A, B, Map[A, B]] { self =>
+                    with scala.collection.Map[A, B] 
+                    with MapLike[A, B, Map[A, B]] { self =>
 
   override def empty: Map[A, B] = Map.empty
 
@@ -34,6 +38,9 @@ trait Map[A, +B] extends Iterable[(A, B)]
   def withDefaultValue[B1 >: B](d: B1): Map[A, B1] = new Map.WithDefault[A, B1](this, x => d)
 }
 
+/**
+ * @since 1
+ */
 object Map extends ImmutableMapFactory[Map] {
   implicit def builderFactory[A, B]: BuilderFactory[(A, B), Map[A, B], Coll] = new MapBuilderFactory[A, B]
 

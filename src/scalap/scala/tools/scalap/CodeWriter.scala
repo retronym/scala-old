@@ -1,11 +1,11 @@
 /*     ___ ____ ___   __   ___   ___
 **    / _// __// _ | / /  / _ | / _ \    Scala classfile decoder
-**  __\ \/ /__/ __ |/ /__/ __ |/ ___/    (c) 2003-2006, LAMP/EPFL
-** /____/\___/_/ |_/____/_/ |_/_/
+**  __\ \/ /__/ __ |/ /__/ __ |/ ___/    (c) 2003-2009, LAMP/EPFL
+** /____/\___/_/ |_/____/_/ |_/_/        http://scala-lang.org/
 **
 */
 
-// $Id: CodeWriter.scala 5837 2006-02-23 17:37:25 +0000 (Thu, 23 Feb 2006) michelou $
+// $Id$
 
 package scala.tools.scalap
 
@@ -43,12 +43,12 @@ class CodeWriter(writer: Writer) {
   }
 
   def indent: CodeWriter = {
-    level = level + 1
+    level += 1
     this
   }
 
   def undent: CodeWriter = {
-    level = level - 1
+    level -= 1
     this
   }
 
@@ -117,7 +117,7 @@ class CodeWriter(writer: Writer) {
       var i = 0
       while (i < level) {
         writer.write(step)
-        i = i + 1
+        i += 1
       }
     }
     if (space)

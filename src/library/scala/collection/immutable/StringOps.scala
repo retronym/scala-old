@@ -6,12 +6,15 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: RichString.scala 18589 2009-08-27 14:45:35Z odersky $
+// $Id$
 
 
 package scala.collection
 package immutable
 
+/**
+ * @since 2.8
+ */
 class StringOps(override val repr: String) extends StringLike[String] {
 
   override protected[this] def thisCollection: WrappedString = new WrappedString(repr)

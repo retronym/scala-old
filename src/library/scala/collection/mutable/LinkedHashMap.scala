@@ -9,25 +9,30 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
+import generic._
 import Predef._
-import scala.collection.generic._
 
 /** This class implements mutable maps using a hashtable.
  *
  *  @author  Matthias Zenger
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.7
  */
 object LinkedHashMap extends MutableMapFactory[LinkedHashMap] {
   implicit def builderFactory[A, B]: BuilderFactory[(A, B), LinkedHashMap[A, B], Coll] = new MapBuilderFactory[A, B]
   def empty[A, B] = new LinkedHashMap[A, B]
 }
 
+/**
+ * @since 2.7
+ */
 @serializable
 class LinkedHashMap[A, B] extends Map[A, B] 
-                             with MutableMapTemplate[A, B, LinkedHashMap[A, B]] 
+                             with MapLike[A, B, LinkedHashMap[A, B]] 
                              with HashTable[A] {
 
   override def empty = LinkedHashMap.empty[A, B]

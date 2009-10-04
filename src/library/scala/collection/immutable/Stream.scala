@@ -6,13 +6,14 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: Stream.scala 16287 2008-10-18 13:41:36Z nielsen $
+// $Id$
 
 
-package scala.collection.immutable
+package scala.collection
+package immutable
 
-import scala.collection.mutable.ListBuffer
-import scala.collection.generic._
+import generic._
+import mutable.{Builder, LazyBuilder, ListBuffer}
 import scala.annotation.tailrec
 
 /**
@@ -35,14 +36,15 @@ import scala.annotation.tailrec
  *
  * @author Martin Odersky, Matthias Zenger
  * @version 1.1 08/08/03
+ * @since   2.8
  */
-abstract class Stream[+A] extends LinearSequence[A] 
-                             with TraversableClass[A, Stream]
-                             with LinearSequenceTemplate[A, Stream[A]] {
+abstract class Stream[+A] extends LinearSeq[A] 
+                             with GenericTraversableTemplate[A, Stream]
+                             with LinearSeqLike[A, Stream[A]] {
 self =>
-  override def companion: Companion[Stream] = Stream
+  override def companion: GenericCompanion[Stream] = Stream
 
-  import collection.{Traversable, Iterable, Sequence, Vector}
+  import scala.collection.{Traversable, Iterable, Seq, Vector}
 
   /** is this stream empty? */
   def isEmpty: Boolean
@@ -315,7 +317,7 @@ self =>
     these
   }
 
-  // there's nothing we can do about dropRight, so we just keep the definition in LinearSequence
+  // there's nothing we can do about dropRight, so we just keep the definition in LinearSeq
   
   /** Returns the longest prefix of this stream whose elements satisfy
    *  the predicate <code>p</code>.
@@ -394,8 +396,9 @@ self =>
  *
  * @author Martin Odersky, Matthias Zenger
  * @version 1.1 08/08/03
+ * @since   2.8
  */
-object Stream extends SequenceFactory[Stream] {
+object Stream extends SeqFactory[Stream] {
   
   /** The factory for streams.
    *  @note Methods such as map/flatMap will not invoke the Builder factory,
@@ -412,14 +415,14 @@ object Stream extends SequenceFactory[Stream] {
   /** Creates a new builder for a stream */
   def newBuilder[A]: Builder[A, Stream[A]] = new StreamBuilder[A]
 
-  import collection.{Iterable, Sequence, Vector}
+  import scala.collection.{Iterable, Seq, Vector}
 
   /** A builder for streams
    *  @note: This builder is lazy only in the sense that it does not go downs the spine
    *         of traversables taht are added as a whole. If more layzness can be achieved,
    *         this builder should be bypassed.
    */
-  class StreamBuilder[A] extends LazyBuilder[A, Stream[A]] {
+  class StreamBuilder[A] extends scala.collection.mutable.LazyBuilder[A, Stream[A]] {
     def result: Stream[A] = (for (xs <- parts.iterator; x <- xs.toIterable.iterator) yield x).toStream
   }
 
@@ -553,7 +556,7 @@ object Stream extends SequenceFactory[Stream] {
   /** The concatenation of all streams returned by an iterator
    */
   @deprecated("use xs.toStream.flatten instead")
-  def concat[A](xs: Iterator[Stream[A]]): Stream[A] = xs.toStream.flatten //(conforms[Stream[A], collection.Traversable[A]])
+  def concat[A](xs: Iterator[Stream[A]]): Stream[A] = xs.toStream.flatten //(conforms[Stream[A], scala.collection.Traversable[A]])
 
   /**
    * Create a stream with element values

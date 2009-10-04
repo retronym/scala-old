@@ -8,14 +8,15 @@
 
 // $Id$
 
-package scala.collection.generic
-import scala.collection._
+package scala.collection
+package generic
 
 /** This class represents collections that can be reduced using a - operator.
  *        
  *  @author   Martin Odersky
  *  @owner   Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait Subtractable[A, +This <: Subtractable[A, This]] { self =>
 

@@ -6,13 +6,14 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: List.scala 16287 2008-10-18 13:41:36Z nielsen $
+// $Id$
 
 
-package scala.collection.immutable
+package scala.collection
+package immutable
 
-import scala.collection.mutable.ListBuffer
-import scala.collection.generic._
+import generic._
+import mutable.{Builder, ListBuffer}
 import annotation.tailrec
 
 /** A class representing an ordered collection of elements of type
@@ -23,14 +24,15 @@ import annotation.tailrec
  *
  *  @author  Martin Odersky and others
  *  @version 2.8
+ *  @since   2.8
  */
-sealed abstract class List[+A] extends LinearSequence[A] 
+sealed abstract class List[+A] extends LinearSeq[A] 
                                   with Product 
-                                  with TraversableClass[A, List]
-                                  with LinearSequenceTemplate[A, List[A]] {
-  override def companion: Companion[List] = List
+                                  with GenericTraversableTemplate[A, List]
+                                  with LinearSeqLike[A, List[A]] {
+  override def companion: GenericCompanion[List] = List
 
-  import collection.{Iterable, Traversable, Sequence, Vector}
+  import scala.collection.{Iterable, Traversable, Seq, Vector}
 
   /** Returns true if the list does not contain any elements.
    *  @return <code>true</code>, iff the list is empty.
@@ -140,7 +142,7 @@ sealed abstract class List[+A] extends LinearSequence[A]
     loop(this)
   }
 
-  // Overridden methods from IterableTemplate or overloaded variants of such methods
+  // Overridden methods from IterableLike or overloaded variants of such methods
   
   /** Create a new list which contains all elements of this list
    *  followed by all elements of Traversable `that'
@@ -224,6 +226,8 @@ sealed abstract class List[+A] extends LinearSequence[A]
     loop(drop(n), this)
   }
   
+  // dropRight is inherited from Stream
+
   /** Split the list at a given point and return the two parts thus
    *  created.
    *
@@ -354,7 +358,7 @@ sealed abstract class List[+A] extends LinearSequence[A]
    *    <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>,
    *    which should be true iff <code>e1</code> is smaller than
    *    <code>e2</code>.
-   *  !!! todo: move sorting to IterableTemplate
+   *  !!! todo: move sorting to IterableLike
    *  </p>
    *
    *  @param lt the comparison function
@@ -428,16 +432,14 @@ sealed abstract class List[+A] extends LinearSequence[A]
 
     ms(this)
   }
-  
-  // !!! The above sort could be replaced by:
-  //   def sort(lt: (A, A) => Boolean): List[A] = super.sortWith(lt)
-  // except that it fails to find a ClassManifest.
+
 }
 
 /** The empty list.
  *
  *  @author  Martin Odersky
  *  @version 1.0, 15/07/2003
+ *  @since   2.8
  */
 @SerialVersionUID(0 - 8256821097970055419L)
 case object Nil extends List[Nothing] {
@@ -448,7 +450,7 @@ case object Nil extends List[Nothing] {
     throw new NoSuchElementException("tail of empty list")
   // Removal of equals method here might lead to an infinite recusion similar to IntMap.equals.
   override def equals(that: Any) = that match {
-    case that1: Sequence[_] => that1.isEmpty
+    case that1: Seq[_] => that1.isEmpty
     case _ => false
   }
 }
@@ -457,6 +459,7 @@ case object Nil extends List[Nothing] {
  *
  *  @author  Martin Odersky
  *  @version 1.0, 15/07/2003
+ *  @since   2.8
  */
 @SerialVersionUID(0L - 8476791151983527571L)
 final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extends List[B] {
@@ -493,10 +496,11 @@ final case class ::[B](private var hd: B, private[scala] var tl: List[B]) extend
  *
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
-object List extends SequenceFactory[List] {
+object List extends SeqFactory[List] {
   
-  import collection.{Iterable, Sequence, Vector}
+  import scala.collection.{Iterable, Seq, Vector}
 
   implicit def builderFactory[A]: BuilderFactory[A, List[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, List[A]] = new ListBuffer[A]
@@ -743,6 +747,7 @@ object List extends SequenceFactory[List] {
 
   /** Returns the list resulting from applying the given function <code>f</code>
    *  to corresponding elements of the argument lists.
+   *
    *  @param f function to apply to each pair of elements.
    *  @return <code>[f(a0,b0), ..., f(an,bn)]</code> if the lists are 
    *          <code>[a0, ..., ak]</code>, <code>[b0, ..., bl]</code> and
@@ -837,7 +842,7 @@ object List extends SequenceFactory[List] {
    *  @param xss the list of lists
    *  @return    the transposed list of lists
    */
-  @deprecated("use p`xss.transpose' instead")
+  @deprecated("use `xss.transpose' instead")
   def transpose[A](xss: List[List[A]]): List[List[A]] = {
     val buf = new ListBuffer[List[A]]
     var yss = xss

@@ -57,7 +57,7 @@ trait ModelToXML extends ModelExtractor {
       if (definitions.isFunctionType(tpe)) {
         val (args,r) = tpe.normalize.typeArgs.splitAt(tpe.normalize.typeArgs.length - 1);
         args.mkXML("(", ", ", ")")(link) ++ Text(" => ") ++ link(r.head);
-      } else if (tpe.typeSymbol == definitions.RepeatedParamClass) {
+      } else if (definitions.isRepeatedParamType(tpe)) {
         assert(tpe.typeArgs.length == 1)
         link(tpe.typeArgs(0)) ++ Text("*")
       } else if (tpe.typeSymbol == definitions.ByNameParamClass) {
@@ -362,13 +362,8 @@ trait ModelToXML extends ModelExtractor {
         }
       Group(name ++ Text(buf.toString))
     }
-    if (entity.sym.hasFlag(symtab.Flags.CASE)) NodeSeq.Empty;
-    else {
-      val sep = Text("@")
-      val seq = // !!! does it still get confused otherwise? 
-      for (attr <- entity.attributes)
-        yield Group({(sep ++ attrFor(attr) ++ <br/>)})
-      seq
-    }
+    def toGroup(x: AnnotationInfo): Node = Group(Text("@") ++ attrFor(x) ++ <br/>)
+    if (entity.sym.hasFlag(symtab.Flags.CASE)) NodeSeq.Empty
+    else NodeSeq fromSeq (entity.attributes map toGroup)
   }
 }

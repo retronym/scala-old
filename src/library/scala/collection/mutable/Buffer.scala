@@ -9,9 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
 /** Buffers are used to create sequences of elements incrementally by
  *  appending, prepending, or inserting new elements. It is also
@@ -21,16 +22,18 @@ import scala.collection.generic._
  *  @author Matthias Zenger
  *  @author Martin Odersky
  *  @version 2.8
+ *  @since   1
   */
 @cloneable
-trait Buffer[A] extends Sequence[A] 
-                   with TraversableClass[A, Buffer]
-                   with BufferTemplate[A, Buffer[A]] {
-  override def companion: Companion[Buffer] = Buffer
+trait Buffer[A] extends Seq[A] 
+                   with GenericTraversableTemplate[A, Buffer]
+                   with BufferLike[A, Buffer[A]] {
+  override def companion: GenericCompanion[Buffer] = Buffer
 }
 
-/* Factory object for `Buffer` trait */
-object Buffer extends SequenceFactory[Buffer] {
+/** Factory object for <code>Buffer</code> trait.
+ */
+object Buffer extends SeqFactory[Buffer] {
   implicit def builderFactory[A]: BuilderFactory[A, Buffer[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, Buffer[A]] = new ArrayBuffer
 }

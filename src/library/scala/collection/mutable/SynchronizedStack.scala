@@ -9,7 +9,8 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
 
 /** This is a synchronized version of the <code>Stack[T]</code> class. It
@@ -18,9 +19,10 @@ package scala.collection.mutable
  * 
  *  @author  Matthias Zenger
  *  @version 1.0, 03/05/2004
+ *  @since   1
  */
 class SynchronizedStack[A] extends Stack[A] {
-  import collection.Traversable
+  import scala.collection.Traversable
 
   /** Checks if the stack is empty.
    *
@@ -48,7 +50,7 @@ class SynchronizedStack[A] extends Stack[A] {
    *
    *  @param  iter        an iterable object
    */
-  override def pushAll(elems: collection.Traversable[A]): this.type = synchronized[this.type] { super.pushAll(elems) }
+  override def pushAll(elems: scala.collection.Traversable[A]): this.type = synchronized[this.type] { super.pushAll(elems) }
 
   /** Pushes all elements provided by an iterator
    *  on top of the stack. The elements are pushed in the order they

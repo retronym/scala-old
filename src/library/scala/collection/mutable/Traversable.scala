@@ -5,26 +5,37 @@
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
-package scala.collection.mutable
 
-import scala.collection.generic._
+// $Id$
 
-/** A subtrait of collection.Traversable which represents traversables
- *  that can be mutated.
+
+package scala.collection
+package mutable
+
+import generic._
+
+/** A subtrait of <code>collection.Traversable</code> which represents
+ *  traversables that can be mutated.
  *        
- *  @author   Martin Odersky
+ *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
-trait Traversable[A] extends collection.Traversable[A] 
-                        with TraversableClass[A, Traversable] 
-                        with TraversableTemplate[A, Traversable[A]]
+trait Traversable[A] extends scala.collection.Traversable[A] 
+                        with GenericTraversableTemplate[A, Traversable] 
+                        with TraversableLike[A, Traversable[A]]
                         with Mutable { 
-  override def companion: Companion[Traversable] = Traversable
+  override def companion: GenericCompanion[Traversable] = Traversable
 }
 
-/* A factory object for the trait `Traversable` */
+/** A factory object for the trait <code>Traversable</code>.
+ *        
+ *  @author  Martin Odersky
+ *  @version 2.8
+ */
 object Traversable extends TraversableFactory[Traversable] {
-  implicit def builderFactory[A]: BuilderFactory[A, Traversable[A], Coll] = new VirtualBuilderFactory[A]
+  implicit def builderFactory[A]: BuilderFactory[A, Traversable[A], Coll] =
+    new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, Traversable[A]] = new ArrayBuffer
 }
 

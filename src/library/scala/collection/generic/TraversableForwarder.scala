@@ -34,6 +34,7 @@ import mutable.Buffer
  *
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait TraversableForwarder[+A] extends Traversable[A] {
 
@@ -41,7 +42,7 @@ trait TraversableForwarder[+A] extends Traversable[A] {
   protected def underlying: Traversable[A]
   
   // Iterable delegates
-  // Iterable methods could be printed by  cat IterableTemplate.scala | sed -n '/trait Iterable/,$ p' | egrep '^  (override )?def'
+  // Iterable methods could be printed by  cat TarversableLike.scala | sed -n '/trait Iterable/,$ p' | egrep '^  (override )?def'
   
   override def isEmpty = underlying.isEmpty
   override def nonEmpty = underlying.nonEmpty
@@ -61,7 +62,7 @@ trait TraversableForwarder[+A] extends Traversable[A] {
   override def copyToArray[B >: A](xs: Array[B], start: Int, len: Int) = underlying.copyToArray(xs, start, len)
   override def toArray[B >: A : ClassManifest]: Array[B] = underlying.toArray
   override def toList: List[A] = underlying.toList
-  override def toSequence: Sequence[A] = underlying.toSequence
+  override def toSeq: Seq[A] = underlying.toSeq
   override def toStream: Stream[A] = underlying.toStream
   override def mkString(start: String, sep: String, end: String): String = underlying.mkString(start, sep, end)
   override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder = underlying.addString(b, start, sep, end)

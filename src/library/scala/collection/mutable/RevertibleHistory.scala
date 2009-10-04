@@ -6,22 +6,24 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: RevertableHistory.scala 16893 2009-01-13 13:09:22Z cunei $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
 
-/** A revertable history is a <code>History</code> object which supports
+/** A revertible history is a <code>History</code> object which supports
  *  an undo operation. Type variable <code>A</code> refers to the type
  *  of the published events, <code>B</code> denotes the publisher type.
  *  Type <code>B</code> is typically a subtype of <code>Publisher</code>.
  *  
  *  @author  Matthias Zenger
  *  @version 1.0, 08/07/2003
+ *  @since   2.8
  */
 @serializable
-class RevertableHistory[A <: Undoable, B] extends History[A, B] with Undoable {
+class RevertibleHistory[A <: Undoable, B] extends History[A, B] with Undoable {
 
   /** Rollback the full history.
    */

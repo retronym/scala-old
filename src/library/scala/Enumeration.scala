@@ -11,10 +11,10 @@
 
 package scala
 
-
-import scala.collection.mutable.{Map, HashMap}
+import scala.collection.SetLike
+import scala.collection.mutable.{Builder, AddingBuilder, Map, HashMap}
 import scala.collection.immutable.{Set, BitSet}
-import scala.collection.generic.{Builder, BuilderFactory, AddingBuilder, SetTemplate}
+import scala.collection.generic.BuilderFactory
 
 /** <p>
  *    Defines a finite set of values specific to the enumeration. Typically
@@ -169,14 +169,16 @@ abstract class Enumeration(initial: Int, names: String*) {
     /** this enumeration value as an <code>Int</code> bit mask.
      *  @throws IllegalArgumentException if <code>id</code> is greater than 31
      */
-    @deprecated def mask32: Int = {
+    @deprecated("mask32 will be removed")
+    def mask32: Int = {
       if (id >= 32) throw new IllegalArgumentException
       1  << id
     }
     /** this enumeration value as an <code>Long</code> bit mask. 
      *  @throws IllegalArgumentException if <code>id</code> is greater than 63
      */
-    @deprecated def mask64: Long = {
+    @deprecated("mask64 will be removed")
+    def mask64: Long = {
       if (id >= 64) throw new IllegalArgumentException
       1L << id
     }
@@ -213,7 +215,7 @@ abstract class Enumeration(initial: Int, names: String*) {
    *  Iterating through this set will yield values in increasing order of their ids.
    *  @param   ids   The set of ids of values, organized as a BitSet. 
    */
-  class ValueSet private[Enumeration] (val ids: BitSet) extends Set[Value] with SetTemplate[Value, ValueSet] {
+  class ValueSet private[Enumeration] (val ids: BitSet) extends Set[Value] with SetLike[Value, ValueSet] {
     override def empty = ValueSet.empty
     def contains(v: Value) = ids contains (v.id)
     def + (value: Value) = new ValueSet(ids + value.id)
@@ -227,11 +229,7 @@ abstract class Enumeration(initial: Int, names: String*) {
     /** The empty value set */
     val empty = new ValueSet(BitSet.empty)
     /** A value set consisting of given elements */ 
-    def apply(elems: Value*): ValueSet = {
-      var s = empty
-      for (elem <- elems) s = s + elem // !!! change to s += elem --> error
-      s 
-    }
+    def apply(elems: Value*): ValueSet = elems.foldLeft(empty)(_ + _)
     /** A builder object for value sets */
     def newBuilder: Builder[Value, ValueSet] = new AddingBuilder(empty)
     /** The implicit builder for value sets */

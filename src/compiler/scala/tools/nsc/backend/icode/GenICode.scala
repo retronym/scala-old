@@ -12,7 +12,7 @@ package icode
 import scala.collection.mutable.{Map, HashMap, ListBuffer, Buffer, HashSet}
 import scala.tools.nsc.symtab._
 import scala.tools.nsc.util.Position
-
+import PartialFunction._
 
 /** This class ...
  *
@@ -25,6 +25,14 @@ abstract class GenICode extends SubComponent  {
   import global._
   import icodes._
   import icodes.opcodes._
+  import definitions.{
+    ArrayClass, ObjectClass, ThrowableClass,
+    Object_equals
+  }
+  import scalaPrimitives.{
+    isArrayOp, isComparisonOp, isLogicalOp,
+    isUniversalEqualityOp, isReferenceEqualityOp
+  }
 
   val phaseName = "icode"
 
@@ -40,11 +48,11 @@ abstract class GenICode extends SubComponent  {
     val STRING = REFERENCE(definitions.StringClass)
 
     // this depends on the backend! should be changed.
-    val ANY_REF_CLASS = REFERENCE(definitions.ObjectClass)
+    val ANY_REF_CLASS = REFERENCE(ObjectClass)
 
     val SCALA_ALL    = REFERENCE(definitions.NothingClass)
     val SCALA_ALLREF = REFERENCE(definitions.NullClass)
-    val THROWABLE    = REFERENCE(definitions.ThrowableClass)
+    val THROWABLE    = REFERENCE(ThrowableClass)
     
     val BoxesRunTime_equals = 
       if (!forMSIL)
@@ -61,7 +69,7 @@ abstract class GenICode extends SubComponent  {
     override def apply(unit: CompilationUnit): Unit = {
       this.unit = unit
       unit.icode.clear
-      log("Generating icode for " + unit)
+      informProgress("Generating icode for " + unit)
       gen(unit.body)
       this.unit = null
     }
@@ -503,40 +511,19 @@ abstract class GenICode extends SubComponent  {
 
         case Try(block, catches, finalizer) =>
           val kind = toTypeKind(tree.tpe)
-          var tmp: Local = null
-          val guardResult = kind != UNIT && mayCleanStack(finalizer) 
-          if (guardResult) {
-            tmp = ctx.makeLocal(tree.pos, tree.tpe, "tmp")
-          }
-          def duplicateFinalizer = 
-            (new DuplicateLabels(ctx.labels.keySet))(ctx, finalizer)
-          
+
           var handlers = for (CaseDef(pat, _, body) <- catches.reverse)
             yield pat match {
               case Typed(Ident(nme.WILDCARD), tpt) => (tpt.tpe.typeSymbol, kind, {
                 ctx: Context =>
                   ctx.bb.emit(DROP(REFERENCE(tpt.tpe.typeSymbol)));
-                  val ctx1 = genLoad(body, ctx, kind);
-                  if (guardResult) {
-                    ctx1.bb.emit(STORE_LOCAL(tmp))
-                    val ctx2 = genLoad(duplicateFinalizer, ctx1, UNIT)
-                    ctx2.bb.emit(LOAD_LOCAL(tmp))
-                    ctx2
-                  } else
-                    genLoad(duplicateFinalizer, ctx1, UNIT);
+                  genLoad(body, ctx, kind);
                 })
 
-              case Ident(nme.WILDCARD) => (definitions.ThrowableClass, kind, {
+              case Ident(nme.WILDCARD) => (ThrowableClass, kind, {
                 ctx: Context =>
-                  ctx.bb.emit(DROP(REFERENCE(definitions.ThrowableClass)))
-                  val ctx1 = genLoad(body, ctx, kind)
-                  if (guardResult) {
-                    ctx1.bb.emit(STORE_LOCAL(tmp))
-                    val ctx2 = genLoad(duplicateFinalizer, ctx1, UNIT)
-                    ctx2.bb.emit(LOAD_LOCAL(tmp))
-                    ctx2
-                  } else
-                    genLoad(duplicateFinalizer, ctx1, UNIT)
+                  ctx.bb.emit(DROP(REFERENCE(ThrowableClass)))
+                  genLoad(body, ctx, kind)
                 })
 
               case Bind(name, _) =>
@@ -545,32 +532,18 @@ abstract class GenICode extends SubComponent  {
                 (pat.symbol.tpe.typeSymbol, kind, {
                   ctx: Context =>
                     ctx.bb.emit(STORE_LOCAL(exception), pat.pos);
-                    val ctx1 = genLoad(body, ctx, kind);
-                    if (guardResult) {
-                      ctx1.bb.emit(STORE_LOCAL(tmp))
-                      val ctx2 = genLoad(duplicateFinalizer, ctx1, UNIT)
-                      ctx2.bb.emit(LOAD_LOCAL(tmp))
-                      ctx2
-                    } else
-                      genLoad(duplicateFinalizer, ctx1, UNIT);
+                    genLoad(body, ctx, kind);
                 })
             }
 
           ctx.Try(
             bodyCtx => {
               generatedType = kind; //toTypeKind(block.tpe);
-              val ctx1 = genLoad(block, bodyCtx, generatedType);
-              if (guardResult) {
-                val tmp = ctx1.makeLocal(tree.pos, tree.tpe, "tmp")
-                ctx1.bb.emit(STORE_LOCAL(tmp))
-                val ctx2 = genLoad(duplicateFinalizer, ctx1, UNIT)
-                ctx2.bb.emit(LOAD_LOCAL(tmp))
-                ctx2
-              } else
-                genLoad(duplicateFinalizer, ctx1, UNIT)
+              genLoad(block, bodyCtx, generatedType);
             },
             handlers,
-            finalizer)
+            finalizer,
+            tree)
 
         case Throw(expr) =>
           val ctx1 = genLoad(expr, ctx, THROWABLE)
@@ -755,10 +728,9 @@ abstract class GenICode extends SubComponent  {
             } else if (code == scalaPrimitives.CONCAT) {
               ctx1 = genStringConcat(tree, ctx1)
               generatedType = STRING
-            } else if (scalaPrimitives.isArrayOp(code)) {
+            } else if (isArrayOp(code)) {
               ctx1 = genArrayOp(tree, ctx1, code)
-            } else if (scalaPrimitives.isLogicalOp(code) ||
-                       scalaPrimitives.isComparisonOp(code)) {
+            } else if (isLogicalOp(code) || isComparisonOp(code)) {
 
               val trueCtx = ctx1.newBlock
               val falseCtx = ctx1.newBlock
@@ -773,7 +745,7 @@ abstract class GenICode extends SubComponent  {
               generatedType = BOOL
               ctx1 = afterCtx
             } else if (code == scalaPrimitives.SYNCHRONIZED) {
-              val monitor = ctx.makeLocal(tree.pos, definitions.ObjectClass.tpe, "monitor") 
+              val monitor = ctx.makeLocal(tree.pos, ObjectClass.tpe, "monitor") 
               ctx1 = genLoadQualifier(fun, ctx1)
               ctx1.bb.emit(DUP(ANY_REF_CLASS))
               ctx1.bb.emit(STORE_LOCAL(monitor))
@@ -797,7 +769,7 @@ abstract class GenICode extends SubComponent  {
                   exhCtx.bb.emit(THROW())
                   exhCtx.bb.enterIgnoreMode
                   exhCtx
-                })), EmptyTree);
+                })), EmptyTree, tree);
               if (settings.debug.value)
                 log("synchronized block end with block " + ctx1.bb +
                     " closed=" + ctx1.bb.closed);
@@ -829,7 +801,7 @@ abstract class GenICode extends SubComponent  {
 
             val hostClass = fun match {
               case Select(qualifier, _)
-              if (qualifier.tpe.typeSymbol != definitions.ArrayClass) =>
+              if (qualifier.tpe.typeSymbol != ArrayClass) =>
                 qualifier.tpe.typeSymbol
               case _ => sym.owner
             }
@@ -864,8 +836,8 @@ abstract class GenICode extends SubComponent  {
             generatedType = REFERENCE(tree.symbol)
           } else {
             ctx.bb.emit(THIS(ctx.clazz.symbol), tree.pos)
-            if (tree.symbol == definitions.ArrayClass)
-              generatedType = REFERENCE(definitions.BoxedAnyArrayClass)
+            if (tree.symbol == ArrayClass)
+              generatedType = REFERENCE(ObjectClass)
             else
               generatedType = REFERENCE(ctx.clazz.symbol)
           }
@@ -1272,6 +1244,12 @@ abstract class GenICode extends SubComponent  {
         List(tree)
     }
 
+    /** Some useful equality helpers.
+     */
+    def isNull(t: Tree) = cond(t) { case Literal(Constant(null)) => true }
+    
+    /* If l or r is constant null, returns the other ; otherwise null */
+    def ifOneIsNull(l: Tree, r: Tree) = if (isNull(l)) r else if (isNull(r)) l else null
 
     /**
      * Traverse the tree and store label stubs in the context. This is
@@ -1301,7 +1279,7 @@ abstract class GenICode extends SubComponent  {
             super.traverse(tree)
         }
       } traverse(tree);
-
+     
     /**
      * Generate code for conditional expressions. The two basic blocks
      * represent the continuation in case of success/failure of the
@@ -1313,24 +1291,9 @@ abstract class GenICode extends SubComponent  {
                         elseCtx: Context): Unit =
     {
       def genComparisonOp(l: Tree, r: Tree, code: Int) {
-        // special-case reference (in)equality test for null
-        if (code == scalaPrimitives.ID || code == scalaPrimitives.NI) {
-          val expr: Tree = (l, r) match {
-            case (Literal(Constant(null)), expr) => expr
-            case (expr, Literal(Constant(null))) => expr
-            case _ => null
-          }
-          if (expr ne null) {
-            val ctx1 = genLoad(expr, ctx, ANY_REF_CLASS)
-            if (code == scalaPrimitives.ID)
-              ctx1.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, EQ, ANY_REF_CLASS))
-            else
-              ctx1.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, ANY_REF_CLASS))
-            ctx1.bb.close
-            return
-          }
-        }
-
+        if (settings.logEquality.value && isUniversalEqualityOp(code))
+          logEqEq(tree, l, r, code)
+          
         val op: TestOp = code match {
           case scalaPrimitives.LT => LT
           case scalaPrimitives.LE => LE
@@ -1342,70 +1305,74 @@ abstract class GenICode extends SubComponent  {
           case _ => abort("Unknown comparison primitive: " + code)
         }
 
-        val kind = getMaxType(l.tpe :: r.tpe :: Nil)
-        var ctx1 = genLoad(l, ctx, kind);
-        ctx1 = genLoad(r, ctx1, kind);
-        ctx1.bb.emit(CJUMP(thenCtx.bb, elseCtx.bb, op, kind), r.pos)
-        ctx1.bb.close
+        // special-case reference (in)equality test for null (null eq x, x eq null)
+        lazy val nonNullSide = ifOneIsNull(l, r)
+        if (isReferenceEqualityOp(code) && nonNullSide != null) {
+          val ctx1 = genLoad(nonNullSide, ctx, ANY_REF_CLASS)
+          ctx1.bb.emitOnly(
+            CZJUMP(thenCtx.bb, elseCtx.bb, op, ANY_REF_CLASS)
+          )
+        }
+        else {
+          val kind = getMaxType(l.tpe :: r.tpe :: Nil)
+          var ctx1 = genLoad(l, ctx, kind) 
+          ctx1 = genLoad(r, ctx1, kind)
+          
+          ctx1.bb.emitOnly(
+            CJUMP(thenCtx.bb, elseCtx.bb, op, kind) setPos r.pos
+          )
+        }
       }
 
       if (settings.debug.value)
         log("Entering genCond with tree: " + tree);
-
+      
+      // the default emission
+      def default = {
+        val ctx1 = genLoad(tree, ctx, BOOL)
+        ctx1.bb.emitOnly(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL) setPos tree.pos)
+      }
+      
       tree match {
-        case Apply(fun, args)
-          if isPrimitive(fun.symbol) =>
-            val code = scalaPrimitives.getPrimitive(fun.symbol)
+        // The comparison symbol is in ScalaPrimitives's "primitives" map
+        case Apply(fun, args) if isPrimitive(fun.symbol) =>
+          import scalaPrimitives.{ ZNOT, ZAND, ZOR, EQ, getPrimitive }
+          
+          // lhs and rhs of test
+          lazy val Select(lhs, _) = fun
+          lazy val rhs = args.head
 
-            if (code == scalaPrimitives.ZNOT) {
-              val Select(leftArg, _) = fun
-              genCond(leftArg, ctx, elseCtx, thenCtx)
-            }
-            else if ((code == scalaPrimitives.EQ || code == scalaPrimitives.NE)) {
-              val Select(leftArg, _) = fun;
-              if (toTypeKind(leftArg.tpe).isReferenceType) {
-                if (code == scalaPrimitives.EQ)
-                  genEqEqPrimitive(leftArg, args.head, ctx, thenCtx, elseCtx)
-                else
-                  genEqEqPrimitive(leftArg, args.head, ctx, elseCtx, thenCtx)
+          def genZandOrZor(and: Boolean) = {
+            val ctxInterm = ctx.newBlock
+            
+            if (and) genCond(lhs, ctx, ctxInterm, elseCtx)
+            else genCond(lhs, ctx, thenCtx, ctxInterm)
+            
+            genCond(rhs, ctxInterm, thenCtx, elseCtx)
+          }
+          def genRefEq(isEq: Boolean) = {
+            val f = genEqEqPrimitive(lhs, rhs, ctx) _
+            if (isEq) f(thenCtx, elseCtx)
+            else f(elseCtx, thenCtx)
+          }
+          
+          getPrimitive(fun.symbol) match {
+            case ZNOT   => genCond(lhs, ctx, elseCtx, thenCtx)
+            case ZAND   => genZandOrZor(and = true)
+            case ZOR    => genZandOrZor(and = false)
+            case code   =>
+              // x == y where LHS is reference type  
+              if (isUniversalEqualityOp(code) && toTypeKind(lhs.tpe).isReferenceType) {
+                if (code == EQ) genRefEq(isEq = true)
+                else genRefEq(isEq = false)
               }
+              else if (isComparisonOp(code))
+                genComparisonOp(lhs, rhs, code)
               else
-                genComparisonOp(leftArg, args.head, code);
-            }
-            else if (scalaPrimitives.isComparisonOp(code)) {
-              val Select(leftArg, _) = fun
-              genComparisonOp(leftArg, args.head, code)
-            }
-            else {
-              code match {
-                case scalaPrimitives.ZAND =>
-                  val Select(leftArg, _) = fun
+                default
+          }
 
-                  val ctxInterm = ctx.newBlock
-                  genCond(leftArg, ctx, ctxInterm, elseCtx)
-                  genCond(args.head, ctxInterm, thenCtx, elseCtx)
-
-                case scalaPrimitives.ZOR =>
-                  val Select(leftArg, _) = fun
-
-                  val ctxInterm = ctx.newBlock
-                  genCond(leftArg, ctx, thenCtx, ctxInterm)
-                  genCond(args.head, ctxInterm, thenCtx, elseCtx)
-
-                case _ =>
-                  // TODO (maybe): deal with the equals case here
-                  // Current semantics: rich equals (from runtime.Comparator) only when == is used
-                  // See genEqEqPrimitive for implementation
-                  var ctx1 = genLoad(tree, ctx, BOOL)
-                  ctx1.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL), tree.pos)
-                  ctx1.bb.close
-              }
-            }
-
-        case _ =>
-          var ctx1 = genLoad(tree, ctx, BOOL)
-          ctx1.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL), tree.pos)
-          ctx1.bb.close
+        case _ => default
       }
     }
 
@@ -1419,10 +1386,8 @@ abstract class GenICode extends SubComponent  {
      * @param thenCtx target context if the comparison yields true
      * @param elseCtx target context if the comparison yields false
      */
-    def genEqEqPrimitive(l: Tree, r: Tree, ctx: Context,
-                         thenCtx: Context, elseCtx: Context): Unit =
-    {
-
+    def genEqEqPrimitive(l: Tree, r: Tree, ctx: Context)(thenCtx: Context, elseCtx: Context): Unit = {
+      
       def eqEqTempName: Name = "eqEqTemp$"
 
       def getTempLocal: Local = ctx.method.lookupLocal(eqEqTempName) match {
@@ -1430,13 +1395,17 @@ abstract class GenICode extends SubComponent  {
         case None =>
           val local = ctx.makeLocal(l.pos, definitions.AnyRefClass.typeConstructor, eqEqTempName.toString)
           //assert(!l.pos.source.isEmpty, "bad position, unit = "+unit+", tree = "+l+", pos = "+l.pos.source)
-          assert(l.pos.source == unit.source)
-          assert(r.pos.source == unit.source)
+          // Note - I commented these out because they were crashing the test case in ticket #2426
+          // (and I have also had to comment them out at various times while working on equality.)
+          // I don't know what purpose they are serving but it would be nice if they didn't have to
+          // crash the compiler.
+          // assert(l.pos.source == unit.source)
+          // assert(r.pos.source == unit.source)
           local.start = (l.pos).line
           local.end   = (r.pos).line
           local
       }
-      
+
       /** True if the equality comparison is between values that require the use of the rich equality
         * comparator (scala.runtime.Comparator.equals). This is the case when either side of the
         * comparison might have a run-time type subtype of java.lang.Number or java.lang.Character.
@@ -1449,8 +1418,8 @@ abstract class GenICode extends SubComponent  {
 
         val lsym = l.tpe.typeSymbol
         val rsym = r.tpe.typeSymbol
-        (lsym == definitions.ObjectClass) ||
-        (rsym == definitions.ObjectClass) ||
+        (lsym == ObjectClass) ||
+        (rsym == ObjectClass) ||
         (lsym != rsym) && (isBoxed(lsym) || isBoxed(rsym))
       }
 
@@ -1458,61 +1427,60 @@ abstract class GenICode extends SubComponent  {
 
         val ctx1 = genLoad(l, ctx, ANY_REF_CLASS)
         val ctx2 = genLoad(r, ctx1, ANY_REF_CLASS)
-        ctx2.bb.emit(CALL_METHOD(BoxesRunTime_equals, Static(false)))
-        ctx2.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL))
-        ctx2.bb.close
-
+        ctx2.bb.emitOnly(
+          CALL_METHOD(BoxesRunTime_equals, Static(false)),
+          CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL)
+        )
       }
       else {
-
-        (l, r) match {
+        
+        if (isNull(l))
           // null == expr -> expr eq null
-          case (Literal(Constant(null)), expr) =>
-            val ctx1 = genLoad(expr, ctx, ANY_REF_CLASS)
-            ctx1.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, EQ, ANY_REF_CLASS))
-            ctx1.bb.close
-
-          // expr == null -> if(expr eq null) true else expr.equals(null)
-          case (expr, Literal(Constant(null))) =>
-            val eqEqTempLocal = getTempLocal
-            var ctx1 = genLoad(expr, ctx, ANY_REF_CLASS)
-            ctx1.bb.emit(DUP(ANY_REF_CLASS))
-            ctx1.bb.emit(STORE_LOCAL(eqEqTempLocal), l.pos)
-            val nonNullCtx = ctx1.newBlock
-            ctx1.bb.emit(CZJUMP(thenCtx.bb, nonNullCtx.bb, EQ, ANY_REF_CLASS))
-            ctx1.bb.close
-
-            nonNullCtx.bb.emit(LOAD_LOCAL(eqEqTempLocal), l.pos)
-            nonNullCtx.bb.emit(CONSTANT(Constant(null)), r.pos)
-            nonNullCtx.bb.emit(CALL_METHOD(definitions.Object_equals, Dynamic))
-            nonNullCtx.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL))
-            nonNullCtx.bb.close
-
-          // l == r -> if (l eq null) r eq null else l.equals(r)
-          case _ =>
-            val eqEqTempLocal = getTempLocal
-            var ctx1 = genLoad(l, ctx, ANY_REF_CLASS)
+          genLoad(r, ctx, ANY_REF_CLASS).bb emitOnly CZJUMP(thenCtx.bb, elseCtx.bb, EQ, ANY_REF_CLASS)
+        else {
+          val eqEqTempLocal = getTempLocal
+          var ctx1 = genLoad(l, ctx, ANY_REF_CLASS)
+          
+          // dicey refactor section
+          lazy val nonNullCtx = ctx1.newBlock
+          
+          if (isNull(r)) {
+            // expr == null -> if (l eq null) true else l.equals(null)
+            ctx1.bb.emitOnly(
+              DUP(ANY_REF_CLASS),
+              STORE_LOCAL(eqEqTempLocal) setPos l.pos,
+              CZJUMP(thenCtx.bb, nonNullCtx.bb, EQ, ANY_REF_CLASS)
+            )
+            nonNullCtx.bb.emitOnly(
+              LOAD_LOCAL(eqEqTempLocal) setPos l.pos,
+              CONSTANT(Constant(null)) setPos r.pos,
+              CALL_METHOD(Object_equals, Dynamic),
+              CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL)
+            )
+          }
+          else {
+            // l == r -> if (l eq null) r eq null else l.equals(r)
             ctx1 = genLoad(r, ctx1, ANY_REF_CLASS)
             val nullCtx = ctx1.newBlock
-            val nonNullCtx = ctx1.newBlock
-            ctx1.bb.emit(STORE_LOCAL(eqEqTempLocal), l.pos)
-            ctx1.bb.emit(DUP(ANY_REF_CLASS))
-            ctx1.bb.emit(CZJUMP(nullCtx.bb, nonNullCtx.bb, EQ, ANY_REF_CLASS))
-            ctx1.bb.close
-
-            nullCtx.bb.emit(DROP(ANY_REF_CLASS), l.pos) // type of AnyRef
-            nullCtx.bb.emit(LOAD_LOCAL(eqEqTempLocal))
-            nullCtx.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, EQ, ANY_REF_CLASS))
-            nullCtx.bb.close
-
-            nonNullCtx.bb.emit(LOAD_LOCAL(eqEqTempLocal), l.pos)
-            nonNullCtx.bb.emit(CALL_METHOD(definitions.Object_equals, Dynamic))
-            nonNullCtx.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL))
-            nonNullCtx.bb.close
+          
+            ctx1.bb.emitOnly(
+              STORE_LOCAL(eqEqTempLocal) setPos l.pos,
+              DUP(ANY_REF_CLASS),
+              CZJUMP(nullCtx.bb, nonNullCtx.bb, EQ, ANY_REF_CLASS)
+            )          
+            nullCtx.bb.emitOnly(
+              DROP(ANY_REF_CLASS) setPos l.pos, // type of AnyRef
+              LOAD_LOCAL(eqEqTempLocal),
+              CZJUMP(thenCtx.bb, elseCtx.bb, EQ, ANY_REF_CLASS)
+            )
+            nonNullCtx.bb.emitOnly(
+              LOAD_LOCAL(eqEqTempLocal) setPos l.pos,
+              CALL_METHOD(Object_equals, Dynamic),
+              CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL)
+            )
+          }
         }
-
       }
-
     }
 
     /**
@@ -1735,6 +1703,8 @@ abstract class GenICode extends SubComponent  {
       override def equals(other: Any) = f == other;
     }
 
+    def duplicateFinalizer(ctx: Context, finalizer: Tree) =
+      (new DuplicateLabels(ctx.labels.keySet))(ctx, finalizer)
 
     /**
      * The Context class keeps information relative to the current state
@@ -1956,7 +1926,7 @@ abstract class GenICode extends SubComponent  {
        *
        * <code> ctx.Try( ctx => { 
        *   ctx.bb.emit(...) // protected block
-       * }, (definitions.ThrowableClass,
+       * }, (ThrowableClass,
        *   ctx => { 
        *     ctx.bb.emit(...); // exception handler
        *   }), (AnotherExceptionClass,
@@ -1965,16 +1935,40 @@ abstract class GenICode extends SubComponent  {
        */
       def Try(body: Context => Context, 
               handlers: List[(Symbol, TypeKind, (Context => Context))],
-              finalizer: Tree) = {
+              finalizer: Tree,
+              tree: Tree) = {
+
         val outerCtx = this.dup       // context for generating exception handlers, covered by finalizer
         val finalizerCtx = this.dup   // context for generating finalizer handler
         val afterCtx = outerCtx.newBlock
+        var tmp: Local = null
+        val kind = toTypeKind(tree.tpe)
+        val guardResult = kind != UNIT && mayCleanStack(finalizer)
+        
+        if (guardResult) {
+          tmp = this.makeLocal(tree.pos, tree.tpe, "tmp")
+        }
+
+        def emitFinalizer(ctx: Context): Context = if (!finalizer.isEmpty) {
+          val ctx1 = finalizerCtx.dup.newBlock
+          ctx.bb.emit(JUMP(ctx1.bb))
+          ctx.bb.close
+
+          if (guardResult) {
+            ctx1.bb.emit(STORE_LOCAL(tmp))
+            val ctx2 = genLoad(duplicateFinalizer(ctx1, finalizer), ctx1, UNIT)
+            ctx2.bb.emit(LOAD_LOCAL(tmp))
+            ctx2
+          } else
+            genLoad(duplicateFinalizer(ctx1, finalizer), ctx1, UNIT)
+        } else ctx
+
 
         val finalizerExh = if (finalizer != EmptyTree) Some({
           val exh = outerCtx.newHandler(NoSymbol, toTypeKind(finalizer.tpe)) // finalizer covers exception handlers
           this.addActiveHandler(exh)  // .. and body aswell 
           val ctx = finalizerCtx.enterHandler(exh)
-          val exception = ctx.makeLocal(finalizer.pos, definitions.ThrowableClass.tpe, "exc")
+          val exception = ctx.makeLocal(finalizer.pos, ThrowableClass.tpe, "exc")
           if (settings.Xdce.value) ctx.bb.emit(LOAD_EXCEPTION())
           ctx.bb.emit(STORE_LOCAL(exception));
           val ctx1 = genLoad(finalizer, ctx, UNIT);
@@ -1990,23 +1984,21 @@ abstract class GenICode extends SubComponent  {
             var ctx1 = outerCtx.enterHandler(exh)
             if (settings.Xdce.value) ctx1.bb.emit(LOAD_EXCEPTION())
             ctx1 = handler._3(ctx1)
-            ctx1.bb.emit(JUMP(afterCtx.bb))
-            ctx1.bb.close
+            // emit finalizer
+            val ctx2 = emitFinalizer(ctx1)
+            ctx2.bb.emit(JUMP(afterCtx.bb))
+            ctx2.bb.close
             exh
           }
         val bodyCtx = this.newBlock
         if (finalizer != EmptyTree)
           bodyCtx.addFinalizer(finalizer)
 
-        val finalCtx = body(bodyCtx)
+        var finalCtx = body(bodyCtx)
+        finalCtx = emitFinalizer(finalCtx)
 
         outerCtx.bb.emit(JUMP(bodyCtx.bb))
         outerCtx.bb.close
-
-        exhs.reverse foreach finalCtx.removeHandler
-        if (finalizer != EmptyTree) {
-          finalCtx.removeFinalizer(finalizer)
-        }
 
         finalCtx.bb.emit(JUMP(afterCtx.bb))
         finalCtx.bb.close
@@ -2161,4 +2153,39 @@ abstract class GenICode extends SubComponent  {
     override def varsInScope: Buffer[Local] = new ListBuffer
   }
   
+  /** Log equality tests to file if they are playing with typefire */
+  def logEqEq(tree: Tree, l: Tree, r: Tree, code: Int) {
+    import definitions._
+    val op = if (code == scalaPrimitives.EQ) "==" else if (code == scalaPrimitives.NE) "!=" else "??"
+      
+    def mayBeNumericComparison: Boolean = {
+      def isPossiblyBoxed(sym: Symbol): Boolean = {
+        import definitions._
+        // classes as which a boxed primitive may statically appear
+        val possibleBoxes = List(BoxedNumberClass, BoxedCharacterClass, SerializableClass, ComparableClass)
+       
+        (sym == ObjectClass) || (possibleBoxes exists (sym isNonBottomSubClass _))
+      }
+      
+      val lsym = l.tpe.typeSymbol
+      val rsym = r.tpe.typeSymbol
+      
+      def isSameBox = {
+        def isFinalBox(s: Symbol) = (s isNonBottomSubClass BoxedNumberClass) && s.isFinal
+        isFinalBox(lsym) && isFinalBox(rsym) && lsym == rsym
+      } 
+      isPossiblyBoxed(lsym) && isPossiblyBoxed(rsym) && !isSameBox
+    }
+    
+    val tkl = toTypeKind(l.tpe)
+    val tkr = toTypeKind(r.tpe)
+    lazy val whereAreWe = tree.pos.source + ":" + tree.pos.line
+    def logit(preface: String) =
+      runtime.Equality.log("[%s] %s %s %s (%s)".format(preface, l.tpe, op, r.tpe, whereAreWe))
+    
+    if (tkl.isNumericType && tkr.isNumericType && tkl != tkr)
+      logit(" KNOWN ")
+    else if (mayBeNumericComparison)
+      logit("UNKNOWN")
+  }
 }

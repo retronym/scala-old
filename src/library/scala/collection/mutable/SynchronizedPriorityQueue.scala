@@ -1,4 +1,3 @@
-/* TODO: Reintegrate
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
@@ -10,8 +9,8 @@
 // $Id$
 
 
-package scala.collection.mutable
-
+package scala.collection
+package mutable
 
 /** This class implements synchronized priority queues using a heap.
  *  The elements of the queue have to be ordered in terms of the
@@ -19,8 +18,9 @@ package scala.collection.mutable
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 03/05/2004
+ *  @since   1
  */
-class SynchronizedPriorityQueue[A <% Ordered[A]] extends PriorityQueue[A] {
+class SynchronizedPriorityQueue[A](implicit ord: Ordering[A]) extends PriorityQueue[A] {
 
   /** Checks if the queue is empty.
    *
@@ -32,20 +32,35 @@ class SynchronizedPriorityQueue[A <% Ordered[A]] extends PriorityQueue[A] {
    *
    *  @param  elem        the element to insert
    */
-  override def +=(elem: A): Unit = synchronized { super.+=(elem) }
+  override def +=(elem: A): this.type = {
+    synchronized {
+      super.+=(elem)
+    }
+    this
+  }
 
   /** Adds all elements provided by an <code>Iterable</code> object
    *  into the priority queue.
    *
    *  @param  iter        an iterable object
    */
-  override def ++=(iter: collection.Iterable[A]): Unit = synchronized { super.++=(iter) }
+  def ++=(iter: scala.collection.Iterable[A]): this.type = {
+    synchronized {
+      super.++=(iter)
+    }
+    this
+  }
 
   /** Adds all elements provided by an iterator into the priority queue.
    *
    *  @param  it        an iterator
    */
-  override def ++=(it: Iterator[A]): Unit = synchronized { super.++=(it) }
+  override def ++=(it: Iterator[A]): this.type = {
+    synchronized {
+      super.++=(it)
+    }
+    this
+  }
 
   /** Adds all elements to the queue.
    *
@@ -91,4 +106,3 @@ class SynchronizedPriorityQueue[A <% Ordered[A]] extends PriorityQueue[A] {
    */
   override def toString(): String = synchronized { super.toString() }
 }
-*/

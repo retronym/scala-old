@@ -26,7 +26,7 @@ import scheduler.{ThreadPoolConfig, QuitException}
  * @version 0.9.18
  * @author Philipp Haller
  */
-class FJTaskScheduler2(val initCoreSize: Int, val maxSize: Int, daemon: Boolean) extends Thread with ActorGC {
+class FJTaskScheduler2(val initCoreSize: Int, val maxSize: Int, daemon: Boolean) extends Thread with IScheduler with ActorGC {
   setDaemon(daemon)
 
   /** Default constructor creates a non-daemon thread. */
@@ -48,19 +48,7 @@ class FJTaskScheduler2(val initCoreSize: Int, val maxSize: Int, daemon: Boolean)
 
   private var submittedTasks = 0
 
-  def printActorDump {}
-
   private val CHECK_FREQ = 100
-
-  def onLockup(handler: () => Unit) =
-    lockupHandler = handler
-
-  def onLockup(millis: Int)(handler: () => Unit) = {
-    //LOCKUP_CHECK_FREQ = millis / CHECK_FREQ
-    lockupHandler = handler
-  }
-
-  private var lockupHandler: () => Unit = null
 
   private def allWorkersBlocked: Boolean =
     executor.threads.forall(t => {

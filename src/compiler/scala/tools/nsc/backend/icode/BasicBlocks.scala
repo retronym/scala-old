@@ -59,8 +59,8 @@ trait BasicBlocks {
       if (b) setFlag(LOOP_HEADER) else resetFlag(LOOP_HEADER)
     
     /** Is this block the start block of an exception handler? */
-    def exceptionHandlerHeader = hasFlag(EX_HEADER)
-    def exceptionHandlerHeader_=(b: Boolean) = 
+    def exceptionHandlerStart = hasFlag(EX_HEADER)
+    def exceptionHandlerStart_=(b: Boolean) = 
       if (b) setFlag(EX_HEADER) else resetFlag(EX_HEADER)
 
     /** Has this basic block been modified since the last call to 'toList'? */ 
@@ -339,6 +339,19 @@ trait BasicBlocks {
     def emit(instrs: Seq[Instruction]) {
       instrs foreach (i => emit(i, i.pos))
     }
+    
+    /** The semantics of this are a little odd but it's designed to work
+     *  seamlessly with the existing code.  It emits each supplied instruction,
+     *  then closes the block.  The odd part is that if the instruction has
+     *  pos == NoPosition, it calls the 1-arg emit, but otherwise it calls
+     *  the 2-arg emit.  This way I could retain existing behavior exactly by
+     *  calling setPos on any instruction using the two arg version which
+     *  I wanted to include in a call to emitOnly.
+     */
+    def emitOnly(instrs: Instruction*) {
+      instrs foreach (i => if (i.pos == NoPosition) emit(i) else emit(i, i.pos))
+      this.close
+    }
 
     /** Close the block */
     def close {
@@ -425,7 +438,7 @@ trait BasicBlocks {
     private def exceptionalSucc(b: BasicBlock, succs: List[BasicBlock]): List[BasicBlock] = {
       def findSucc(s: BasicBlock): List[BasicBlock] = { 
         val ss = method.exh flatMap { h => 
-          if (h.covers(s)) List(h.startBlock) else Nil
+          if (h.covers(s) /*&& mayThrow(h.startBlock.firstInstruction)*/) List(h.startBlock) else Nil
         }
         ss ++ (ss flatMap findSucc)
       }

@@ -9,19 +9,21 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.script._
+import script._
 
 /** This class should be used as a mixin. It synchronizes the <code>Buffer</code>
  *  methods of the class into which it is mixed in.
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 08/07/2003
+ *  @since   1
  */
 trait SynchronizedBuffer[A] extends Buffer[A] {
 
-  import collection.Traversable
+  import scala.collection.Traversable
 
   abstract override def length: Int = synchronized {
     super.length

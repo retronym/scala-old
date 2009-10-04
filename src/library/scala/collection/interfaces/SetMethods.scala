@@ -6,14 +6,17 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection.interfaces
+package scala.collection
+package interfaces
 
-import scala.collection._
 import generic._
 import mutable.Buffer
 import scala.reflect.ClassManifest
 import annotation.unchecked.uncheckedVariance
 
+/**
+ * @since 2.8
+ */
 trait AddableMethods[A, +This <: Addable[A, This]] {
   protected def repr: This
   def +(elem: A): This
@@ -22,6 +25,9 @@ trait AddableMethods[A, +This <: Addable[A, This]] {
   def ++ (iter: Iterator[A]): This
 } 
 
+/**
+ * @since 2.8
+ */
 trait SubtractableMethods[A, +This <: Subtractable[A, This]] {
   protected def repr: This
   def -(elem: A): This
@@ -30,7 +36,10 @@ trait SubtractableMethods[A, +This <: Subtractable[A, This]] {
   def --(iter: Iterator[A]): This
 }
 
-trait SetMethods[A, +This <: SetTemplate[A, This] with Set[A]]
+/**
+ * @since 2.8
+ */
+trait SetMethods[A, +This <: SetLike[A, This] with Set[A]]
 extends IterableMethods[A, This]
 with AddableMethods[A, This]
 with SubtractableMethods[A, This]

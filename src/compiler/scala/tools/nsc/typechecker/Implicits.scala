@@ -2,7 +2,7 @@
  * Copyright 2005-2009 LAMP/EPFL
  * @author  Martin Odersky
  */
-// $Id: Typers.scala 17229 2009-03-02 19:09:42Z extempore $
+// $Id$
 
 //todo: rewrite or disllow new T where T is a mixin (currently: <init> not a member of T)
 //todo: use inherited type info also for vars and values
@@ -38,7 +38,6 @@ self: Analyzer =>
   var manifFail = 0L
   var hits = 0
   var misses = 0
-  var uncached = 0
 
   /** Search for an implicit value. See the comment on `result` at the end of class `ImplicitSearch`
    *  for more info how the search is conducted. 
@@ -62,7 +61,7 @@ self: Analyzer =>
   }
 
   final val sizeLimit = 50000
-  val implicitsCache = new LinkedHashMap[AnyRef, SearchResult]
+  val implicitsCache = new LinkedHashMap[Type, List[List[ImplicitInfo]]]
 
   def resetImplicits() { implicitsCache.clear() }
 
@@ -298,9 +297,9 @@ self: Analyzer =>
           isStable(info.pre)) {
 
         val itree = atPos(tree.pos.focus) {
-          if (info.pre == NoPrefix) Ident(info.name)
+          if (info.pre == NoPrefix) Ident(info.name) 
           else Select(gen.mkAttributedQualifier(info.pre), info.name)
-        }
+        } 
         //if (traceImplicits) println("typed impl?? "+info.name+":"+info.tpe+" ==> "+itree+" with "+wildPt)
         def fail(reason: String): SearchResult = {
           if (settings.XlogImplicits.value)
@@ -310,10 +309,11 @@ self: Analyzer =>
         try {
           val itree1 = 
             if (isView)
-              typed1(
+              typed1 (
                 atPos(itree.pos) (
                   Apply(itree, List(Ident("<argument>").setType(approximate(pt.typeArgs.head))))), 
-                  EXPRmode, approximate(pt.typeArgs.tail.head))
+                EXPRmode, approximate(pt.typeArgs.tail.head)
+              )
             else
               typed1(itree, EXPRmode, wildPt)
 
@@ -576,8 +576,18 @@ self: Analyzer =>
      *  These are all implicits found in companion objects of classes C
      *  such that some part of `tp` has C as one of its superclasses.
      */
-    private def implicitsOfExpectedType: List[List[ImplicitInfo]] =
-      parts(pt).iterator.map(implicitsOfClass).toList
+    private def implicitsOfExpectedType: List[List[ImplicitInfo]] = implicitsCache get pt match {
+      case Some(implicitInfoss) => hits += 1; implicitInfoss
+      case None                 => {
+        misses += 1
+        val implicitInfoss = parts(pt).iterator.map(implicitsOfClass).toList
+        implicitsCache(pt) = implicitInfoss
+        if (implicitsCache.size >= sizeLimit)
+          implicitsCache -= implicitsCache.keysIterator.next
+        implicitInfoss
+      }
+    }
+
 
     /** The manifest corresponding to type `pt`, provided `pt` is an instance of Manifest.
      */
@@ -602,14 +612,14 @@ self: Analyzer =>
     private def manifestOfType(tp: Type, full: Boolean): Tree = {
       
       /** Creates a tree that calls the factory method called constructor in object reflect.Manifest */
-      def manifestFactoryCall(constructor: String, args: Tree*): Tree =
+      def manifestFactoryCall(constructor: String, tparg: Type, args: Tree*): Tree =
         if (args contains EmptyTree) EmptyTree
         else 
           typed { atPos(tree.pos.focus) {
             Apply(
               TypeApply(
                 Select(gen.mkAttributedRef(if (full) FullManifestModule else PartialManifestModule), constructor),
-                List(TypeTree(tp))
+                List(TypeTree(tparg))
               ),
               args.toList
             )
@@ -623,7 +633,7 @@ self: Analyzer =>
 
       def mot(tp0: Type): Tree = tp0.normalize match {
         case ThisType(_) | SingleType(_, _) =>
-          manifestFactoryCall("singleType", gen.mkAttributedQualifier(tp0)) 
+          manifestFactoryCall("singleType", tp, gen.mkAttributedQualifier(tp0)) 
         case ConstantType(value) =>
           manifestOfType(tp0.deconst, full)
         case TypeRef(pre, sym, args) =>
@@ -631,15 +641,17 @@ self: Analyzer =>
             typed { atPos(tree.pos.focus) {
               Select(gen.mkAttributedRef(FullManifestModule), sym.name.toString)
             }}
-          } else if (sym.isClass) {
+          } else if (sym == ArrayClass && args.length == 1) {
+            manifestFactoryCall("arrayType", args.head, findSubManifest(args.head))
+           } else if (sym.isClass) {
             val suffix = gen.mkClassOf(tp0) :: (args map findSubManifest)
             manifestFactoryCall(
-              "classType", 
+              "classType", tp, 
               (if ((pre eq NoPrefix) || pre.typeSymbol.isStaticOwner) suffix
                else findSubManifest(pre) :: suffix): _*)
           } else if (sym.isAbstractType && !sym.isTypeParameterOrSkolem && !sym.isExistential) {
             manifestFactoryCall(
-              "abstractType", 
+              "abstractType", tp,
               findSubManifest(pre) :: Literal(sym.name.toString) :: findManifest(tp0.bounds.hi) :: (args map findSubManifest): _*)
           } else {
             EmptyTree  // a manifest should have been found by normal searchImplicit
@@ -647,7 +659,7 @@ self: Analyzer =>
         case RefinedType(parents, decls) =>
           // refinement is not generated yet
           if (parents.length == 1) findManifest(parents.head)
-          else manifestFactoryCall("intersectionType", parents map (findSubManifest(_)): _*)
+          else manifestFactoryCall("intersectionType", tp, parents map (findSubManifest(_)): _*)
         case ExistentialType(tparams, result) =>
           mot(result)
         case _ =>
@@ -671,50 +683,6 @@ self: Analyzer =>
       }
     }
 
-    /** Construct a fresh symbol tree for an implicit parameter
-        because of caching, must clone symbols that represent bound variables, 
-        or we will end up with different bound variables that are represented by the same symbol */
-    def freshenFunctionParameters(tree : Tree) : Tree = new Transformer {
-      currentOwner = context.owner
-      override val treeCopy = new LazyTreeCopier
-      override def transform(tr : Tree) = super.transform(tr match {
-        case Function(vparams, body) => {
-          // New tree
-          val sym = tr.symbol cloneSymbol currentOwner
-          val res = tr.duplicate setSymbol sym
-          // New parameter symbols
-          var oldsyms = vparams map (_.symbol)
-          var newsyms = cloneSymbols(oldsyms, sym)
-          // Fix all symbols
-          new TreeSymSubstituter(oldsyms, newsyms) traverse res
-          res
-        }
-        case x => x
-      })
-    } transform tree
-
-    /** Return cached search result if found. Otherwise update cache
-     *  but keep within sizeLimit entries
-     */
-    def cacheResult(key: AnyRef): SearchResult = implicitsCache get key match {
-      case Some(sr: SearchResult) => 
-        hits += 1
-        if (sr == SearchFailure) sr
-        else {
-          val result = new SearchResult(freshenFunctionParameters(sr.tree.duplicate), sr.subst) // #2201: generate fresh symbols for parameters
-          for (t <- result.tree) t.setPos(tree.pos.focus)
-          result
-        }
-      case None => 
-        misses += 1
-        val r = searchImplicit(implicitsOfExpectedType, false)
-        //println("new fact: search implicit of "+key+" = "+r)
-        implicitsCache(key) = r
-        if (implicitsCache.size >= sizeLimit)
-          implicitsCache -= implicitsCache.keysIterator.next
-        r
-    }
-
     /** The result of the implicit search:
      *  First search implicits visible in current context.
      *  If that fails, search implicits in expected type `pt`.
@@ -726,13 +694,8 @@ self: Analyzer =>
       var result = searchImplicit(context.implicitss, true)
       val timer1 = System.nanoTime()
       if (result == SearchFailure) inscopeFail += timer1 - start else inscopeSucceed += timer1 - start
-      if (result == SearchFailure) {
-        result = pt match {
-          case _: UniqueType => cacheResult(pt)
-          case WildcardName(name) => cacheResult(name)
-          case _ => uncached += 1; searchImplicit(implicitsOfExpectedType, false)
-         }
-      }
+      if (result == SearchFailure)
+        result = searchImplicit(implicitsOfExpectedType, false)
 
       val timer2 = System.nanoTime()
       if (result == SearchFailure) oftypeFail += timer2 - timer1 else oftypeSucceed += timer2 - timer1
@@ -743,7 +706,7 @@ self: Analyzer =>
       val timer3 = System.nanoTime()
       if (result == SearchFailure) manifFail += timer3 - timer2 else manifSucceed += timer3 - timer2
       if (result == SearchFailure && settings.debug.value)
-        println("no implicits found for "+pt+" "+pt.typeSymbol.info.baseClasses+" "+parts(pt)+implicitsOfExpectedType)
+        log("no implicits found for "+pt+" "+pt.typeSymbol.info.baseClasses+" "+parts(pt)+implicitsOfExpectedType)
       implicitTime += System.nanoTime() - start    
       result
     }

@@ -13,9 +13,8 @@ package scala.runtime
 
 import Predef._
 import scala.reflect.ClassManifest
-import collection.mutable.{Vector, ArrayBuilder, ArrayBuffer}
-import collection.generic._
-import collection.Sequence
+import collection.mutable._
+import collection.Seq
 
 /**
  *  <p>A class representing <code>Array[T]</code></p>
@@ -23,8 +22,12 @@ import collection.Sequence
  *  @author  Martin Odersky, Stephane Micheloud
  *  @version 1.0
  */
-abstract class BoxedArray[A] extends Vector[A] with VectorTemplate[A, BoxedArray[A]] with Boxed { self =>
+abstract class BoxedArray[A] extends Vector[A] with VectorLike[A, BoxedArray[A]] with Boxed { self =>
 
+  val ex = new Error("trying to create a BoxedArray")
+  ex.printStackTrace()
+  throw ex
+                                                                                                 
   /** The manifest of the element type */
   def elemManifest: ClassManifest[A]
 
@@ -40,8 +43,7 @@ abstract class BoxedArray[A] extends Vector[A] with VectorTemplate[A, BoxedArray
   /** Creates new builder for this collection ==> move to subclasses
    */
   override protected[this] def newBuilder: Builder[A, BoxedArray[A]] = 
-    if (elemManifest != null) new ArrayBuilder[A](elemManifest)
-    else genericBuilder[A]
+    genericBuilder[A]
 
   // !!! todo: remove
   override def genericBuilder[B]: Builder[B, BoxedArray[B]] = new ArrayBuffer[B].mapResult {

@@ -10,7 +10,7 @@ package transform
 import symtab._
 import Flags.{ CASE => _, _ }
 import scala.collection.mutable.ListBuffer
-import matching.{ TransMatcher, PatternNodes, ParallelMatching }
+import matching.{ TransMatcher, Patterns, PatternNodes, ParallelMatching }
 
 /** This class ...
  *
@@ -20,6 +20,7 @@ import matching.{ TransMatcher, PatternNodes, ParallelMatching }
 abstract class ExplicitOuter extends InfoTransform
       with TransMatcher
       with PatternNodes
+      with Patterns
       with ParallelMatching
       with TypingTransformers
       with ast.TreeDSL
@@ -386,7 +387,7 @@ abstract class ExplicitOuter extends InfoTransform
       }
 
       val t = atPos(tree.pos) {
-        val context     = MatchMatrixContext(transform, localTyper, currentOwner, tree.tpe)
+        val context     = MatrixContext(transform, localTyper, currentOwner, tree.tpe)
         val t_untyped   = handlePattern(nselector, ncases, checkExhaustive, context)
         
         /* if @switch annotation is present, verify the resulting tree is a Match */
@@ -396,7 +397,7 @@ abstract class ExplicitOuter extends InfoTransform
             unit.error(tree.pos, "could not emit switch for @switch annotated match")
         }
         
-        localTyper.typed(t_untyped, context.resultType) 
+        localTyper.typed(t_untyped, context.matchResultType) 
       }
 
       if (nguard.isEmpty) t
@@ -490,6 +491,7 @@ abstract class ExplicitOuter extends InfoTransform
     override def transformUnit(unit: CompilationUnit) {
       cunit = unit
       atPhase(phase.next) { super.transformUnit(unit) }
+      cunit = null
     }
   }
 

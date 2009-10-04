@@ -85,6 +85,7 @@ trait Definitions {
     lazy val MatchErrorClass                = getClass("scala.MatchError")
     // java is hard coded because only used by structural values
     lazy val InvocationTargetExceptionClass = getClass("java.lang.reflect.InvocationTargetException")
+    lazy val NoSuchMethodExceptionClass     = getClass("java.lang.NoSuchMethodException")
     
     // annotations
     lazy val AnnotationClass            = getClass("scala.Annotation")
@@ -97,6 +98,11 @@ trait Definitions {
     lazy val SwitchClass                = getClass("scala.annotation.switch")
     lazy val ExperimentalClass          = getClass("scala.annotation.experimental")
     lazy val ElidableMethodClass        = getClass("scala.annotation.elidable")
+    lazy val FieldClass                 = getClass("scala.annotation.target.field")
+    lazy val GetterClass                = getClass("scala.annotation.target.getter")
+    lazy val SetterClass                = getClass("scala.annotation.target.setter")
+    lazy val BeanGetterClass            = getClass("scala.annotation.target.beanGetter")
+    lazy val BeanSetterClass            = getClass("scala.annotation.target.beanSetter")
 
     // fundamental reference classes
     lazy val ScalaObjectClass     = getClass("scala.ScalaObject")
@@ -126,12 +132,23 @@ trait Definitions {
     lazy val TypeConstraintClass  = getClass("scala.TypeConstraint")
     lazy val SingletonClass       = newClass(ScalaPackageClass, nme.Singleton, anyparam) setFlag (ABSTRACT | TRAIT | FINAL)
     lazy val SerializableClass    = getClass(sn.Serializable)
+    lazy val ComparableClass      = getClass("java.lang.Comparable")
     
     lazy val RepeatedParamClass = newCovariantPolyClass(
       ScalaPackageClass,
       nme.REPEATED_PARAM_CLASS_NAME, 
       tparam => seqType(tparam.typeConstructor)
     )
+
+    lazy val JavaRepeatedParamClass = newCovariantPolyClass(
+      ScalaPackageClass,
+      nme.JAVA_REPEATED_PARAM_CLASS_NAME, 
+      tparam => arrayType(tparam.typeConstructor)
+    )
+
+    def isRepeatedParamType(tp: Type) = 
+      tp.typeSymbol == RepeatedParamClass || tp.typeSymbol == JavaRepeatedParamClass
+
     lazy val ByNameParamClass = newCovariantPolyClass(
       ScalaPackageClass,
       nme.BYNAME_PARAM_CLASS_NAME,
@@ -151,8 +168,8 @@ trait Definitions {
       def Iterable_next     = getMember(IterableClass, nme.next)
       def Iterable_hasNext  = getMember(IterableClass, nme.hasNext)
     
-    lazy val SeqClass   = getClass2("scala.Seq", "scala.collection.Sequence")
-    lazy val SeqModule  = getModule2("scala.Seq", "scala.collection.Sequence")
+    lazy val SeqClass   = getClass2("scala.Seq", "scala.collection.Seq")
+    lazy val SeqModule  = getModule2("scala.Seq", "scala.collection.Seq")
       def Seq_length = getMember(SeqClass, nme.length)
     lazy val RandomAccessSeqMutableClass = getMember(
       getModule2("scala.RandomAccessSeq", "scala.collection.Vector"), nme.Mutable)
@@ -216,6 +233,11 @@ trait Definitions {
     } 
     
     val MaxTupleArity, MaxProductArity, MaxFunctionArity = 22
+    /** The maximal dimensions of a generic array creation.
+     *  I.e. new Array[Array[Array[Array[Array[T]]]]] creates a 5 times
+     *  nested array. More is not allowed.
+     */
+    val MaxArrayDims = 5
     lazy val TupleClass     = mkArityArray("Tuple", MaxTupleArity)
     lazy val ProductClass   = mkArityArray("Product", MaxProductArity)
     lazy val FunctionClass  = mkArityArray("Function", MaxFunctionArity, 0)
@@ -281,6 +303,7 @@ trait Definitions {
     }
     
     def seqType(arg: Type) = typeRef(SeqClass.typeConstructor.prefix, SeqClass, List(arg))
+    def arrayType(arg: Type) = typeRef(ArrayClass.typeConstructor.prefix, ArrayClass, List(arg))
 
     //
     // .NET backend
@@ -347,9 +370,17 @@ trait Definitions {
     lazy val BoxedNumberClass       = getClass(sn.BoxedNumber)
     lazy val BoxedCharacterClass    = getClass(sn.BoxedCharacter)
     lazy val BoxedBooleanClass      = getClass(sn.BoxedBoolean)
+    lazy val BoxedByteClass         = getClass("java.lang.Byte")
+    lazy val BoxedShortClass        = getClass("java.lang.Short")
+    lazy val BoxedIntClass          = getClass("java.lang.Integer")
+    lazy val BoxedLongClass         = getClass("java.lang.Long")
+    lazy val BoxedFloatClass        = getClass("java.lang.Float")
+    lazy val BoxedDoubleClass       = getClass("java.lang.Double")
+    
     lazy val BoxedUnitClass         = getClass("scala.runtime.BoxedUnit")
     lazy val BoxedUnitModule        = getModule("scala.runtime.BoxedUnit")
       def BoxedUnit_UNIT = getMember(BoxedUnitModule, "UNIT")
+      def BoxedUnit_TYPE = getMember(BoxedUnitModule, "TYPE")
 
     // special attributes
     lazy val SerializableAttr: Symbol = getClass("scala.serializable")
@@ -488,6 +519,7 @@ trait Definitions {
         .setInfo(mkTypeBounds(NothingClass.typeConstructor, AnyClass.typeConstructor))
 
     val boxedClass = new HashMap[Symbol, Symbol]
+    val boxedModule = new HashMap[Symbol, Symbol]
     val unboxMethod = new HashMap[Symbol, Symbol] // Type -> Method
     val boxMethod = new HashMap[Symbol, Symbol] // Type -> Method
     val boxedArrayClass = new HashMap[Symbol, Symbol]
@@ -513,6 +545,7 @@ trait Definitions {
 
       val clazz = newClass(ScalaPackageClass, name, anyvalparam) setFlag (ABSTRACT | FINAL)
       boxedClass(clazz) = getClass(boxedName)
+      boxedModule(clazz) = getModule(boxedName)
       boxedArrayClass(clazz) = getClass("scala.runtime.Boxed" + name + "Array")
       refClass(clazz) = getClass("scala.runtime." + name + "Ref")
       abbrvTag(clazz) = tag
@@ -658,16 +691,9 @@ trait Definitions {
     def isValueClass(sym: Symbol): Boolean =
       (sym eq UnitClass) || (boxedClass contains sym)
 
-    /** Is symbol a value class? */
+    /** Is symbol a numeric value class? */
     def isNumericValueClass(sym: Symbol): Boolean =
       (sym ne BooleanClass) && (boxedClass contains sym)
-
-    def isValueType(sym: Symbol) =
-      isValueClass(sym) || unboxMethod.contains(sym)
-
-    /** Is symbol a value or array class? */
-    def isUnboxedClass(sym: Symbol): Boolean =
-      isValueType(sym) || sym == ArrayClass
 
     def signature(tp: Type): String = {
       def erasure(tp: Type): Type = tp match {
@@ -735,9 +761,32 @@ trait Definitions {
       String_+ = newMethod(
         StringClass, "+", anyparam, StringClass.typeConstructor) setFlag FINAL
 
-      // #2264
-      val tmp = AnnotationDefaultAttr
+      val forced = List( // force initialization of every symbol that is enetred as a side effect
+        AnnotationDefaultAttr,
+        RepeatedParamClass,
+        JavaRepeatedParamClass,
+        ByNameParamClass,
+        UnitClass,   
+        ByteClass,   
+        ShortClass,  
+        CharClass,   
+        IntClass,    
+        LongClass,   
+        FloatClass,  
+        DoubleClass, 
+        BooleanClass,
+        AnyClass,
+        AnyRefClass,
+        AnyValClass,
+        NullClass,
+        NothingClass,
+        SingletonClass,
+        EqualsPatternClass
+      )
 
+      // #2264
+      var tmp = AnnotationDefaultAttr
+      tmp = RepeatedParamClass // force initalization
       if (forMSIL) {
         val intType = IntClass.typeConstructor
         val intParam = List(intType)
@@ -777,8 +826,7 @@ trait Definitions {
         newMethod(StringClass, "trim", List(), stringType)
         newMethod(StringClass, "intern", List(), stringType)
         newMethod(StringClass, "replace", List(charType, charType), stringType)
-        newMethod(StringClass, "toCharArray", List(),
-                  appliedType(ArrayClass.typeConstructor, List(charType)))
+        newMethod(StringClass, "toCharArray", List(), arrayType(charType))
       }
     } //init
 

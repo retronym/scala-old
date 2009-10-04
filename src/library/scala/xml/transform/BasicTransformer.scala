@@ -31,7 +31,7 @@ abstract class BasicTransformer extends Function1[Node,Node]
    *  to NodeBuffer.
    */
   def transform(it: Iterator[Node], nb: NodeBuffer): Seq[Node] =
-    it.foldLeft(nb)(_ ++= transform(_)) toArray
+    it.foldLeft(nb)(_ ++= transform(_)).toSeq
 
   /** Call transform(Node) to each node in ns, yield ns if nothing changes,
    *  otherwise a new sequence of concatenated results.
@@ -51,7 +51,7 @@ abstract class BasicTransformer extends Function1[Node,Node]
         val nch = transform(ch)
         
         if (ch eq nch) n
-        else           Elem(n.prefix, n.label, n.attributes, n.scope, nch:_*)
+        else           Elem(n.prefix, n.label, n.attributes, n.scope, nch: _*)
     }
     else n
   }

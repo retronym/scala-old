@@ -12,7 +12,7 @@
 package scala
 
 import collection.immutable.StringOps
-import collection.mutable.{StringBuilder, ArrayOps}
+import collection.mutable.ArrayOps
 import collection.generic.BuilderFactory
 
 /** The <code>Predef</code> object provides definitions that are
@@ -67,7 +67,7 @@ object Predef extends LowPriorityImplicits {
   
   private val P = scala.`package`  // to force scala package object to be seen.
   private val L = scala.collection.immutable.List // to force Nil, :: to be seen.
-  private val S = StringBuilder // to force StringBuilder to be seen.
+  private val S = scala.collection.mutable.StringBuilder // to force StringBuilder to be seen.
   
   val $scope = scala.xml.TopScope
 
@@ -81,13 +81,15 @@ object Predef extends LowPriorityImplicits {
 
   type Manifest[T] = scala.reflect.Manifest[T]
   type ClassManifest[T] = scala.reflect.ClassManifest[T]
-  def evidence[T](implicit e: T) = e
+  def implicitly[T](implicit e: T) = e
   def manifest[T](implicit m: Manifest[T]) = m
   def classManifest[T](implicit m: ClassManifest[T]) = m
 
   // will soon stop being a view: subsumed by `conforms` (which is less likely to give rise to ambiguities)
   // @see `conforms` for the implicit version
   implicit def identity[A](x: A): A = x 
+
+  def currentThread = java.lang.Thread.currentThread()
 
   // errors and asserts -------------------------------------------------
 
@@ -214,33 +216,34 @@ object Predef extends LowPriorityImplicits {
   implicit def unaugmentString(x: StringOps): String = x.repr
 
   implicit def stringBuilderFactory: BuilderFactory[Char, String, String] = 
-    new BuilderFactory[Char, String, String] { def apply(from: String) = new StringBuilder }
+    new BuilderFactory[Char, String, String] { def apply(from: String) = new scala.collection.mutable.StringBuilder }
 
   implicit def any2stringadd(x: Any) = new runtime.StringAdd(x)
 
-  implicit def genericAugmentArray[T](xs: Array[T]): ArrayOps[T] = (xs: AnyRef) match { // !!! drop the AnyRef and get unreachable code errors!
-    case x: Array[AnyRef] => augmentArray[AnyRef](x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Int] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Double] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Long] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Float] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Char] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Byte] => augmentArray(x).asInstanceOf[ArrayOps[T]] 
-    case x: Array[Short] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Boolean] => augmentArray(x).asInstanceOf[ArrayOps[T]]
-    case x: Array[Unit] => augmentArray(x).asInstanceOf[ArrayOps[T]]
+  implicit def genericArrayOps[T](xs: Array[T]): ArrayOps[T] = (xs: AnyRef) match { // !!! drop the AnyRef and get unreachable code errors!
+    case x: Array[AnyRef] => refArrayOps[AnyRef](x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Int] => intArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Double] => doubleArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Long] => longArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Float] => floatArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Char] => charArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Byte] => byteArrayOps(x).asInstanceOf[ArrayOps[T]] 
+    case x: Array[Short] => shortArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Boolean] => booleanArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case x: Array[Unit] => unitArrayOps(x).asInstanceOf[ArrayOps[T]]
+    case null => null
   }
 
-  implicit def augmentArray[T <: AnyRef](xs: Array[T]): ArrayOps[T] = new ArrayOps.ofRef[T](xs.asInstanceOf[Array[AnyRef]])
-  implicit def augmentArray(xs: Array[Int]): ArrayOps[Int] = new ArrayOps.ofInt(xs)
-  implicit def augmentArray(xs: Array[Double]): ArrayOps[Double] = new ArrayOps.ofDouble(xs)
-  implicit def augmentArray(xs: Array[Long]): ArrayOps[Long] = new ArrayOps.ofLong(xs)
-  implicit def augmentArray(xs: Array[Float]): ArrayOps[Float] = new ArrayOps.ofFloat(xs)
-  implicit def augmentArray(xs: Array[Char]): ArrayOps[Char] = new ArrayOps.ofChar(xs)
-  implicit def augmentArray(xs: Array[Byte]): ArrayOps[Byte] = new ArrayOps.ofByte(xs)
-  implicit def augmentArray(xs: Array[Short]): ArrayOps[Short] = new ArrayOps.ofShort(xs)
-  implicit def augmentArray(xs: Array[Boolean]): ArrayOps[Boolean] = new ArrayOps.ofBoolean(xs)
-  implicit def augmentArray(xs: Array[Unit]): ArrayOps[Unit] = new ArrayOps.ofUnit(xs)
+  implicit def refArrayOps[T <: AnyRef](xs: Array[T]): ArrayOps[T] = new ArrayOps.ofRef[T](xs)
+  implicit def intArrayOps(xs: Array[Int]): ArrayOps[Int] = new ArrayOps.ofInt(xs)
+  implicit def doubleArrayOps(xs: Array[Double]): ArrayOps[Double] = new ArrayOps.ofDouble(xs)
+  implicit def longArrayOps(xs: Array[Long]): ArrayOps[Long] = new ArrayOps.ofLong(xs)
+  implicit def floatArrayOps(xs: Array[Float]): ArrayOps[Float] = new ArrayOps.ofFloat(xs)
+  implicit def charArrayOps(xs: Array[Char]): ArrayOps[Char] = new ArrayOps.ofChar(xs)
+  implicit def byteArrayOps(xs: Array[Byte]): ArrayOps[Byte] = new ArrayOps.ofByte(xs)
+  implicit def shortArrayOps(xs: Array[Short]): ArrayOps[Short] = new ArrayOps.ofShort(xs)
+  implicit def booleanArrayOps(xs: Array[Boolean]): ArrayOps[Boolean] = new ArrayOps.ofBoolean(xs)
+  implicit def unitArrayOps(xs: Array[Unit]): ArrayOps[Unit] = new ArrayOps.ofUnit(xs)
 
   implicit def exceptionWrapper(exc: Throwable) = new runtime.RichException(exc)
   
@@ -294,6 +297,13 @@ object Predef extends LowPriorityImplicits {
     override def toString: String = xs.mkString("")
   }
 
+  implicit def arrayToCharSequence(xs: Array[Char]): CharSequence = new CharSequence {
+    def length: Int = xs.length
+    def charAt(index: Int): Char = xs(index)
+    def subSequence(start: Int, end: Int): CharSequence = arrayToCharSequence(xs.slice(start, end))
+    override def toString: String = xs.mkString("")
+  }
+
   // used, for example, in the encoding of generalized constraints
   // we need a new type constructor `<:<` and evidence `conforms`, as 
   // reusing `Function2` and `identity` leads to ambiguities (any2stringadd is inferred)
@@ -302,5 +312,16 @@ object Predef extends LowPriorityImplicits {
   sealed abstract class <:<[-From, +To] //extends (From => To)
   implicit def conforms[A]: A <:< A = new (A <:< A) {def convert(x: A) = x}
 
-  def currentThread = java.lang.Thread.currentThread()
+  /** A type for which there is aways an implicit value.
+   *  @see fallbackBuilderFactory in Array.scala
+   */
+  class DummyImplicit
+  
+  object DummyImplicit {
+  
+    /** An implicit value yielding a DummyImplicit.
+     *   @see fallbackBuilderFactory in Array.scala
+     */
+    implicit def dummyImplicit: DummyImplicit = new DummyImplicit
+  }
 }

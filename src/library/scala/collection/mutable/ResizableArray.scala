@@ -9,9 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
 /** This class is used internally to implement data structures that
  *  are based on resizable arrays.
@@ -19,12 +20,13 @@ import scala.collection.generic._
  *  @author  Matthias Zenger, Burak Emir
  *  @author Martin Odersky
  *  @version 2.8
+ *  @since   1
  */
 trait ResizableArray[A] extends Vector[A] 
-                           with TraversableClass[A, ResizableArray]
-                           with VectorTemplate[A, ResizableArray[A]] { 
+                           with GenericTraversableTemplate[A, ResizableArray]
+                           with VectorLike[A, ResizableArray[A]] { 
 
-  override def companion: Companion[ResizableArray] = ResizableArray
+  override def companion: GenericCompanion[ResizableArray] = ResizableArray
 
   protected def initialSize: Int = 16
   protected var array: Array[AnyRef] = new Array[AnyRef](initialSize max 1)
@@ -61,7 +63,7 @@ trait ResizableArray[A] extends Vector[A]
   /** Copy all elements to a buffer 
    *  @param   The buffer to which elements are copied
   override def copyToBuffer[B >: A](dest: Buffer[B]) {
-    dest ++= (array: Sequence[AnyRef]).asInstanceOf[Sequence[B]]
+    dest ++= (array: Seq[AnyRef]).asInstanceOf[Seq[B]]
   }
    */
 
@@ -112,7 +114,7 @@ trait ResizableArray[A] extends Vector[A]
   }
 }
 
-object ResizableArray extends SequenceFactory[ResizableArray] {
+object ResizableArray extends SeqFactory[ResizableArray] {
   implicit def builderFactory[A]: BuilderFactory[A, ResizableArray[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, ResizableArray[A]] = new ArrayBuffer[A]
 }

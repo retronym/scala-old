@@ -29,28 +29,20 @@ object MetaData {
   @tailrec
   def concatenate(attribs: MetaData, new_tail: MetaData): MetaData =
     if (attribs eq Null) new_tail
-    else concatenate(attribs.next, attribs.copy(new_tail))
+    else concatenate(attribs.next, attribs copy new_tail)
 
   /**
    * returns normalized MetaData, with all duplicates removed and namespace prefixes resolved to
    *  namespace URIs via the given scope.
    */
-  def normalize(attribs: MetaData, scope: NamespaceBinding): MetaData = {
-    import collection.mutable.HashSet
-    def iterate(md: MetaData, normalized_attribs: MetaData, map: HashSet[String]): MetaData = {
-      if (md eq Null)
-        normalized_attribs
-      else {
-        val universal_key = getUniversalKey(md, scope)
-        if (map.contains(universal_key))
-          iterate(md.next, normalized_attribs, map)
-        else {
-          map += universal_key
-          iterate(md.next, md.copy(normalized_attribs), map)
-        } 
-      }
+  def normalize(attribs: MetaData, scope: NamespaceBinding): MetaData = {    
+    def iterate(md: MetaData, normalized_attribs: MetaData, set: Set[String]): MetaData = {
+      lazy val key = getUniversalKey(md, scope)
+      if (md eq Null) normalized_attribs
+      else if (set(key)) iterate(md.next, normalized_attribs, set)
+      else iterate(md.next, md copy normalized_attribs, set + key)
     }
-    iterate(attribs, Null, new HashSet[String])
+    iterate(attribs, Null, Set())
   }
  
   /**
@@ -147,7 +139,7 @@ abstract class MetaData extends Iterable[MetaData]
 
   def isPrefixed: Boolean
 
-  /** deep equals method */
+  /** deep equals method - XXX */
   override def equals(that: Any) = that match {
     case m: MetaData  =>
       (this.length == m.length) &&
@@ -156,27 +148,17 @@ abstract class MetaData extends Iterable[MetaData]
     case _            => false
   }
 
-  /** returns an iterator on attributes */
-  def iterator: Iterator[MetaData] = new Iterator[MetaData] {
-    var x: MetaData = MetaData.this
-    def hasNext = Null != x
-    def next = {
-      val y = x
-      x = x.next
-      y
-    }
-  }
-  override def size : Int = 1 + {
-    if (Null == next) 0 else next.size
-  }
+  /** Returns an iterator on attributes */
+  def iterator: Iterator[MetaData] = Iterator.iterate(this)(_.next) takeWhile (_ != Null)
+  override def size: Int = 1 + iterator.length
 
   /** shallow equals method */
   def equals1(that: MetaData): Boolean
 
   /** filters this sequence of meta data */
-  override def filter(f: MetaData => Boolean): MetaData = {
-    if (f(this)) copy(next filter f) else next filter f
-  }
+  override def filter(f: MetaData => Boolean): MetaData =
+    if (f(this)) copy(next filter f)
+    else next filter f
 
   /** returns key of this MetaData item */
   def key: String
@@ -185,7 +167,7 @@ abstract class MetaData extends Iterable[MetaData]
   def value: Seq[Node]
 
   /** maps this sequence of meta data */
-  def map(f: MetaData => Text): List[Text] = f(this)::(next map f)
+  def map(f: MetaData => Text): List[Text] = (iterator map f).toList
 
   /** returns Null or the next MetaData item */
   def next: MetaData
@@ -196,15 +178,11 @@ abstract class MetaData extends Iterable[MetaData]
    * @param  key
    * @return value in Some(Seq[Node]) if key is found, None otherwise
    */
-  final def get(key: String): Option[Seq[Node]] = apply(key) match {
-    case null => None
-    case x    => Some(x)
-  }
+  final def get(key: String): Option[Seq[Node]] = Option(apply(key))
 
   /** same as get(uri, owner.scope, key) */
   final def get(uri: String, owner: Node, key: String): Option[Seq[Node]] =
     get(uri, owner.scope, key)
-
 
   /** gets value of qualified (prefixed) attribute with given key.
    *
@@ -214,10 +192,7 @@ abstract class MetaData extends Iterable[MetaData]
    * @return value as Some[Seq[Node]] if key is found, None otherwise
    */
   final def get(uri: String, scope: NamespaceBinding, key: String): Option[Seq[Node]] =
-    apply(uri, scope, key) match {
-      case null => None
-      case x    => Some(x)
-    }
+    Option(apply(uri, scope, key))
 
   override def hashCode(): Int
 
@@ -262,5 +237,4 @@ abstract class MetaData extends Iterable[MetaData]
    */
   final def remove(namespace: String, owner: Node, key: String): MetaData =
     remove(namespace, owner.scope, key)
-
 }

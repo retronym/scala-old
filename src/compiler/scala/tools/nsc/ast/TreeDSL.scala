@@ -26,9 +26,8 @@ trait TreeDSL {
     type BooleanTreeFunction2 = (Tree, Tree) => Boolean
     
     // Add a null check to a Tree => Tree function
-    // (this assumes your result Tree is representing a Boolean expression)
-    def nullSafe[T](f: TreeFunction1): TreeFunction1 =
-      tree => (tree OBJ_!= NULL) AND f(tree)
+    def nullSafe[T](f: TreeFunction1, ifNull: Tree): TreeFunction1 =
+      tree => IF (tree MEMBER_== NULL) THEN ifNull ELSE f(tree)
 
     // XXX these two are in scala.PartialFunction now, just have to
     // settle on the final names.
@@ -43,7 +42,7 @@ trait TreeDSL {
       if (f isDefinedAt x) Some(f(x)) else None
     
     // Applies a function to a value and then returns the value.
-    def applyAndReturn[T](f: T => Unit)(x: T): T = { f(x) ; x }
+    def returning[T](f: T => Unit)(x: T): T = { f(x) ; x }
     
     // strip bindings to find what lies beneath
     final def unbind(x: Tree): Tree = x match {
@@ -62,8 +61,8 @@ trait TreeDSL {
     // So it's inconsistent until I devise a better way.
     val TRUE          = LIT(true)
     val FALSE         = LIT(false)
-    val NULL          = LIT(null)
     val ZERO          = LIT(0)
+    def NULL          = LIT(null)
     def UNIT          = LIT(())
     
     object WILD {
@@ -91,7 +90,14 @@ trait TreeDSL {
         if (target == EmptyTree) other
         else if (other == EmptyTree) target
         else gen.mkAnd(target, other)
-                
+      
+      /** Note - calling ANY_== in the matcher caused primitives to get boxed
+       *  for the comparison, whereas looking up nme.EQ does not.
+       */
+      def MEMBER_== (other: Tree)   = {
+        if (target.tpe == null) ANY_==(other)
+        else fn(target, target.tpe member nme.EQ, other)
+      }
       def ANY_NE  (other: Tree)     = fn(target, nme.ne, toAnyRef(other))
       def ANY_EQ  (other: Tree)     = fn(target, nme.eq, toAnyRef(other))
       def ANY_==  (other: Tree)     = fn(target, Any_==, other)
@@ -121,7 +127,7 @@ trait TreeDSL {
       /** Methods for sequences **/      
       def DROP(count: Int): Tree =
         if (count == 0) target
-        else (target DOT nme.drop)(LIT(count)) DOT nme.toSequence
+        else (target DOT nme.drop)(LIT(count))
       
       /** Casting & type tests -- working our way toward understanding exactly
        *  what differs between the different forms of IS and AS.
@@ -135,6 +141,8 @@ trait TreeDSL {
       def IS(tpe: Type)       = gen.mkIsInstanceOf(target, tpe, true)
       def IS_OBJ(tpe: Type)   = gen.mkIsInstanceOf(target, tpe, false)
       
+      // XXX having some difficulty expressing nullSafe in a way that doesn't freak out value types
+      // def TOSTRING()          = nullSafe(fn(_: Tree, nme.toString_), LIT("null"))(target)
       def TOSTRING()          = fn(target, nme.toString_)
       def GETCLASS()          = fn(target, Object_getClass)
     }
@@ -191,7 +199,7 @@ trait TreeDSL {
     
     /** Top level accessible. */
     def THROW(sym: Symbol, msg: Tree = null) = {
-      val arg = if (msg == null) Nil else List(msg.TOSTRING)
+      val arg: List[Tree] = if (msg == null) Nil else List(msg.TOSTRING())
       Throw(New(TypeTree(sym.tpe), List(arg)))
     }
     def NEW(tpe: Tree, args: Tree*)   = New(tpe, List(args.toList))

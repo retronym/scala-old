@@ -8,8 +8,8 @@
 
 // $Id$
 
-package scala.collection.generic
-import scala.collection._
+package scala.collection
+package generic
 
 /** This class represents collections that can be added to other
  *  collections using a '+' operator.
@@ -17,6 +17,7 @@ import scala.collection._
  *  @author   Martin Odersky
  *  @owner   Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait Addable[A, +This <: Addable[A, This]] { self => 
 

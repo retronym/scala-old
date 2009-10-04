@@ -9,9 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
 /** An implementation of the <code>Buffer</code> class using an array to
  *  represent the assembled sequence internally. Append, update and random
@@ -21,28 +22,31 @@ import scala.collection.generic._
  *  @author  Matthias Zenger
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   1
  */
-@serializable
+@serializable @SerialVersionUID(1529165946227428979L)
 class ArrayBuffer[A](override protected val initialSize: Int) 
   extends Buffer[A] 
-     with TraversableClass[A, ArrayBuffer]
-     with BufferTemplate[A, ArrayBuffer[A]]
-     with VectorTemplate[A, ArrayBuffer[A]]
+     with GenericTraversableTemplate[A, ArrayBuffer]
+     with BufferLike[A, ArrayBuffer[A]]
+     with VectorLike[A, ArrayBuffer[A]]
      with Builder[A, ArrayBuffer[A]] 
      with ResizableArray[A] {
 
-  override def companion: Companion[ArrayBuffer] = ArrayBuffer
+  override def companion: GenericCompanion[ArrayBuffer] = ArrayBuffer
 
-  import collection.Traversable
+  import scala.collection.Traversable
 
   def this() = this(16)
 
   def clear() { reduceToSize(0) }
 
   override def sizeHint(len: Int) {
-    val newarray = new Array[AnyRef](len min 1)
-    Array.copy(array, 0, newarray, 0, size0)
-    array = newarray
+    if (len > size && len >= 1) {
+      val newarray = new Array[AnyRef](len min 1)
+      Array.copy(array, 0, newarray, 0, size0)
+      array = newarray
+    }
   }
   
   /** Appends a single element to this buffer and returns
@@ -151,15 +155,21 @@ class ArrayBuffer[A](override protected val initialSize: Int)
   override def clone(): ArrayBuffer[A] = new ArrayBuffer[A] ++= this
 
   def result: ArrayBuffer[A] = this
-  
+
   /** Defines the prefix of the string representation.
    */
   override def stringPrefix: String = "ArrayBuffer"
 }
 
-/* Factory object for `ArrayBuffer` class */
-object ArrayBuffer extends SequenceFactory[ArrayBuffer] {
-  implicit def builderFactory[A]: BuilderFactory[A, ArrayBuffer[A], Coll] = new VirtualBuilderFactory[A]
+/** Factory object for <code>ArrayBuffer</code> class.
+ *
+ *  @author  Martin Odersky
+ *  @version 2.8
+ *  @since   2.8
+ */
+object ArrayBuffer extends SeqFactory[ArrayBuffer] {
+  implicit def builderFactory[A]: BuilderFactory[A, ArrayBuffer[A], Coll] =
+    new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, ArrayBuffer[A]] = new ArrayBuffer[A]
 }
 

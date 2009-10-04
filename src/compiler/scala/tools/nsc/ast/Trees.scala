@@ -52,7 +52,7 @@ trait Trees {
    *    <strong>Note:</strong> the typechecker drops these annotations,
    *    use the AnnotationInfo's (Symbol.annotations) in later phases. 
    */  
-  case class Modifiers(flags: Long, privateWithin: Name, annotations: List[Tree]) {
+  case class Modifiers(flags: Long, privateWithin: Name, annotations: List[Tree], positions: Map[Long, Position]) {
     def isCovariant     = hasFlag(COVARIANT    )  // marked with `+'
     def isContravariant = hasFlag(CONTRAVARIANT)  // marked with `-'
     def isPrivate   = hasFlag(PRIVATE  )
@@ -69,28 +69,30 @@ trait Trees {
     def isTrait     = hasFlag(TRAIT | notDEFERRED) // (part of DEVIRTUALIZE)
     def isImplicit  = hasFlag(IMPLICIT )
     def isPublic    = !isPrivate && !isProtected
-    def hasFlag(flag: Long) = (flag & flags) != 0
+    def hasFlag(flag: Long) = (flag & flags) != 0L
     def & (flag: Long): Modifiers = {
       val flags1 = flags & flag
       if (flags1 == flags) this
-      else Modifiers(flags1, privateWithin, annotations)
+      else Modifiers(flags1, privateWithin, annotations, positions)
     }
     def &~ (flag: Long): Modifiers = {
       val flags1 = flags & (~flag)
       if (flags1 == flags) this
-      else Modifiers(flags1, privateWithin, annotations)
+      else Modifiers(flags1, privateWithin, annotations, positions)
     }
     def | (flag: Long): Modifiers = {
       val flags1 = flags | flag
       if (flags1 == flags) this
-      else Modifiers(flags1, privateWithin, annotations)
+      else Modifiers(flags1, privateWithin, annotations, positions)
     }
     def withAnnotations(annots: List[Tree]) =
       if (annots.isEmpty) this
-      else Modifiers(flags, privateWithin, annotations ::: annots)
+      else Modifiers(flags, privateWithin, annotations ::: annots, positions)
+    def withPosition(flag: Long, position: Position) =
+    	Modifiers(flags, privateWithin, annotations, positions + (flag -> position))
   }
 
-  def Modifiers(flags: Long, privateWithin: Name): Modifiers = Modifiers(flags, privateWithin, List())
+  def Modifiers(flags: Long, privateWithin: Name): Modifiers = Modifiers(flags, privateWithin, List(), new Map.EmptyMap)
   def Modifiers(flags: Long): Modifiers = Modifiers(flags, nme.EMPTY.toTypeName)
 
   val NoMods = Modifiers(0)
@@ -334,7 +336,7 @@ trait Trees {
       case ValDef(mods, _, _, _)    => if (mods.isVariable) "var" else "val"
       case _ => ""
     }
-    final def hasFlag(mask: Long): Boolean = (mods.flags & mask) != 0
+    final def hasFlag(mask: Long): Boolean = (mods.flags & mask) != 0L
   }
 
   /** Package clause
@@ -624,7 +626,7 @@ trait Trees {
       } else {
         // convert (implicit ... ) to ()(implicit ... ) if its the only parameter section
         if (vparamss1.isEmpty ||
-            !vparamss1.head.isEmpty && (vparamss1.head.head.mods.flags & IMPLICIT) != 0) 
+            !vparamss1.head.isEmpty && (vparamss1.head.head.mods.flags & IMPLICIT) != 0L) 
           vparamss1 = List() :: vparamss1;
         val superRef: Tree = atPos(superPos) {
           Select(Super(nme.EMPTY.toTypeName, nme.EMPTY.toTypeName), nme.CONSTRUCTOR)
@@ -821,7 +823,7 @@ trait Trees {
 
   def This(sym: Symbol): Tree = This(sym.name) setSymbol sym
 
-  /** Designator <qualifier> . <selector> */
+  /** Designator <qualifier> . <name> */
   case class Select(qualifier: Tree, name: Name)
        extends RefTree {
     override def isTerm = name.isTermName
@@ -886,7 +888,7 @@ trait Trees {
   case class SingletonTypeTree(ref: Tree)
         extends TypTree
 
-  /** Type selection <qualifier> # <selector>, eliminated by RefCheck */
+  /** Type selection <qualifier> # <name>, eliminated by RefCheck */
   case class SelectFromTypeTree(qualifier: Tree, name: Name)
        extends TypTree with RefTree
 
@@ -908,6 +910,10 @@ trait Trees {
        extends TypTree
 
   case class Parens(args: List[Tree]) extends Tree // only used during parsing
+
+  /** Array selection <qualifier> . <name> only used during erasure */
+  case class SelectFromArray(qualifier: Tree, name: Name, erasure: Type)
+       extends TermTree with RefTree
 
   trait StubTree extends Tree {
     def underlying : AnyRef
@@ -1073,6 +1079,7 @@ trait Trees {
     def AppliedTypeTree(tree: Tree, tpt: Tree, args: List[Tree]): AppliedTypeTree
     def TypeBoundsTree(tree: Tree, lo: Tree, hi: Tree): TypeBoundsTree
     def ExistentialTypeTree(tree: Tree, tpt: Tree, whereClauses: List[Tree]): ExistentialTypeTree
+    def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type): SelectFromArray
   }
 
   class StrictTreeCopier extends TreeCopier {
@@ -1164,6 +1171,8 @@ trait Trees {
       new TypeBoundsTree(lo, hi).copyAttrs(tree)
     def ExistentialTypeTree(tree: Tree, tpt: Tree, whereClauses: List[Tree]) =
       new ExistentialTypeTree(tpt, whereClauses).copyAttrs(tree)
+    def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type) =
+      new SelectFromArray(qualifier, selector, erasure).copyAttrs(tree)
   }
 
   class LazyTreeCopier(treeCopy: TreeCopier) extends TreeCopier {
@@ -1388,6 +1397,11 @@ trait Trees {
       if (tpt0 == tpt) && (whereClauses0 == whereClauses) => t
       case _ => treeCopy.ExistentialTypeTree(tree, tpt, whereClauses)
     }
+    def SelectFromArray(tree: Tree, qualifier: Tree, selector: Name, erasure: Type) = tree match {
+      case t @ SelectFromArray(qualifier0, selector0, _)
+      if (qualifier0 == qualifier) && (selector0 == selector) => t
+      case _ => treeCopy.SelectFromArray(tree, qualifier, selector, erasure)
+    }
   }
 
   abstract class Transformer {
@@ -1510,6 +1524,8 @@ trait Trees {
         treeCopy.TypeBoundsTree(tree, transform(lo), transform(hi)) 
       case ExistentialTypeTree(tpt, whereClauses) =>
         treeCopy.ExistentialTypeTree(tree, transform(tpt), transformTrees(whereClauses))
+      case SelectFromArray(qualifier, selector, erasure) =>
+        treeCopy.SelectFromArray(tree, transform(qualifier), selector, erasure)
       case tree : StubTree => 
         tree.symbol = NoSymbol
         tree.tpe = null
@@ -1538,7 +1554,7 @@ trait Trees {
         else transform(stat)) filter (EmptyTree !=)
     def transformUnit(unit: CompilationUnit) { unit.body = transform(unit.body) }
     def transformModifiers(mods: Modifiers): Modifiers =
-      Modifiers(mods.flags, mods.privateWithin, transformTrees(mods.annotations))
+      Modifiers(mods.flags, mods.privateWithin, transformTrees(mods.annotations), mods.positions)
 
     def atOwner[A](owner: Symbol)(trans: => A): A = {
       val prevOwner = currentOwner
@@ -1659,6 +1675,8 @@ trait Trees {
         traverse(lo); traverse(hi)
       case ExistentialTypeTree(tpt, whereClauses) =>
         traverse(tpt); traverseTrees(whereClauses)
+      case SelectFromArray(qualifier, selector, erasure) =>
+        traverse(qualifier)
       case Parens(ts) =>
         traverseTrees(ts)
       case tree : StubTree =>

@@ -9,10 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
-import scala.collection.immutable
+import generic._
 
 /** A Buffer implementation back up by a list. It provides constant time
  *  prepend and append. Most other operations are linear.
@@ -20,25 +20,26 @@ import scala.collection.immutable
  *  @author  Matthias Zenger
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   1
  */
-@serializable
+@serializable @SerialVersionUID(3419063961353022661L)
 final class ListBuffer[A] 
       extends Buffer[A] 
-         with TraversableClass[A, ListBuffer]
-         with BufferTemplate[A, ListBuffer[A]]
+         with GenericTraversableTemplate[A, ListBuffer]
+         with BufferLike[A, ListBuffer[A]]
          with Builder[A, List[A]] 
-         with SequenceForwarder[A] 
+         with SeqForwarder[A] 
 { 
-  override def companion: Companion[ListBuffer] = ListBuffer
+  override def companion: GenericCompanion[ListBuffer] = ListBuffer
 
-  import collection.Traversable
+  import scala.collection.Traversable
 
   private var start: List[A] = Nil
   private var last0: ::[A] = _
   private var exported: Boolean = false
   private var len = 0
 
-  protected def underlying: immutable.Sequence[A] = start
+  protected def underlying: immutable.Seq[A] = start
  
   /** The current length of the buffer
    */
@@ -47,8 +48,8 @@ final class ListBuffer[A]
   // Implementations of abstract methods in Buffer
 
   /** Replaces element at index <code>n</code> with the new element
-   *  <code>newelem</code>. Takes time linear in the buffer size. (except the first
-   *  element, which is updated in constant time).
+   *  <code>newelem</code>. Takes time linear in the buffer size. (except the
+   *  first element, which is updated in constant time).
    *
    *  @param n  the index of the element to replace.
    *  @param x  the new element.
@@ -61,7 +62,6 @@ final class ListBuffer[A]
         val newElem = new :: (x, start.tail);
         if (last0 eq start) { 
           last0 = newElem
-          len += 1
         }	
         start = newElem
       } else {
@@ -74,7 +74,6 @@ final class ListBuffer[A]
         val newElem = new :: (x, cursor.tail.tail)
         if (last0 eq cursor.tail) {
           last0 = newElem
-          len += 1
         }	
         cursor.asInstanceOf[::[A]].tl = newElem
       }
@@ -164,8 +163,8 @@ final class ListBuffer[A]
     }
   }
 
-  /** Removes a given number of elements on a given index position. May take time linear in
-   *  the buffer size.
+  /** Removes a given number of elements on a given index position. May take
+   *  time linear in the buffer size.
    *
    *  @param n         the index which refers to the first element to remove.
    *  @param count     the number of elements to remove.
@@ -174,7 +173,7 @@ final class ListBuffer[A]
     if (exported) copy()
     val n1 = n max 0
     val count1 = count min (len - n1)
-    var old = start.head;
+    var old = start.head
     if (n1 == 0) {
       var c = count1
       while (c > 0) {
@@ -233,7 +232,7 @@ final class ListBuffer[A]
   def remove(n: Int): A = try {
     if (n < 0 || n >= len) throw new IndexOutOfBoundsException(n.toString())
     if (exported) copy()
-    var old = start.head;
+    var old = start.head
     if (n == 0) {
       start = start.tail
     } else {
@@ -251,7 +250,8 @@ final class ListBuffer[A]
     old
   }
 
-  /** Remove a single element from this buffer. May take time linear in the buffer size.
+  /** Remove a single element from this buffer. May take time linear in the
+   *  buffer size.
    *
    *  @param x  the element to remove.
    */
@@ -290,7 +290,7 @@ final class ListBuffer[A]
   }
 
   /** expose the underlying list but do not mark it as exported */
-  def readOnly: List[A] = start
+  override def readOnly: List[A] = start
 
   // Private methods
 
@@ -303,6 +303,11 @@ final class ListBuffer[A]
       this += cursor.head
       cursor = cursor.tail
     }
+  }
+
+  override def equals(that: Any): Boolean = that match {
+    case that: ListBuffer[_] => this.readOnly equals that.readOnly
+    case _                   => super.equals(that)
   }
 
   /** Returns a clone of this buffer.
@@ -318,9 +323,14 @@ final class ListBuffer[A]
   override def stringPrefix: String = "ListBuffer"
 }
 
-/* Factory object for `ListBuffer` class */
-object ListBuffer extends SequenceFactory[ListBuffer] {
-  implicit def builderFactory[A]: BuilderFactory[A, ListBuffer[A], Coll] = new VirtualBuilderFactory[A]
-  def newBuilder[A]: Builder[A, ListBuffer[A]] = new AddingBuilder(new ListBuffer[A])
+/** Factory object for <code>ListBuffer</code> class.
+ *
+ *  @author  Martin Odersky
+ *  @version 2.8
+ */
+object ListBuffer extends SeqFactory[ListBuffer] {
+  implicit def builderFactory[A]: BuilderFactory[A, ListBuffer[A], Coll] =
+    new VirtualBuilderFactory[A]
+  def newBuilder[A]: Builder[A, ListBuffer[A]] =
+    new AddingBuilder(new ListBuffer[A])
 }
-

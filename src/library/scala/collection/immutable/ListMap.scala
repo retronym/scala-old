@@ -9,14 +9,18 @@
 // $Id$
 
 
+package scala.collection
+package immutable
 
-package scala.collection.immutable
+import generic._
 
-import scala.collection.generic._
-
-/** The canonical factory of <a href="ListMap.html">ListMap</a>'s */
+/** The canonical factory of <a href="ListMap.html">ListMap</a>'s.
+ *
+ *  @since 1
+ */
 object ListMap extends ImmutableMapFactory[ListMap] {
-  implicit def builderFactory[A, B]: BuilderFactory[(A, B), ListMap[A, B], Coll] = new MapBuilderFactory[A, B]
+  implicit def builderFactory[A, B]: BuilderFactory[(A, B), ListMap[A, B], Coll] =
+    new MapBuilderFactory[A, B]
   def empty[A, B]: ListMap[A, B] = new ListMap
 }
 
@@ -28,9 +32,10 @@ object ListMap extends ImmutableMapFactory[ListMap] {
  *  @author  Matthias Zenger
  *  @author  Martin Oderskty
  *  @version 2.0, 01/01/2007
+ *  @since   1
  */
-@serializable
-class ListMap[A, +B] extends Map[A, B] with ImmutableMapTemplate[A, B, ListMap[A, B]] {
+@serializable @SerialVersionUID(301002838095710379L)
+class ListMap[A, +B] extends Map[A, B] with MapLike[A, B, ListMap[A, B]] {
 
   override def empty = ListMap.empty
 
@@ -99,7 +104,7 @@ class ListMap[A, +B] extends Map[A, B] with ImmutableMapTemplate[A, B, ListMap[A
   protected def value: B = throw new NoSuchElementException("empty map")
   protected def next: ListMap[A, B] = throw new NoSuchElementException("empty map")
 
-  @serializable
+  @serializable @SerialVersionUID(-6453056603889598734L)
   protected class Node[B1 >: B](override protected val key: A, 
                                 override protected val value: B1) extends ListMap[A, B1] {
     /** Returns the number of mappings in this map.

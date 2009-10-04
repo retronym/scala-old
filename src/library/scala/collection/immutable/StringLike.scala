@@ -6,15 +6,19 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: RichString.scala 18589 2009-08-27 14:45:35Z odersky $
+// $Id$
 
 
 package scala.collection
 package immutable
 
-import scala.util.matching.Regex
 import generic._
+import mutable.Builder
+import scala.util.matching.Regex
 
+/**
+ * @since 2.8
+ */
 object StringLike {
 
   // just statics for companion class.
@@ -26,6 +30,9 @@ object StringLike {
 
 import StringLike._
 
+/**
+ * @since 2.8
+ */
 trait StringLike[+Repr] extends VectorLike[Char, Repr] with Ordered[String] {
 self =>
 
@@ -126,7 +133,7 @@ self =>
     else if (toString.length == 0) ""
     else {
       val chars = toString.toCharArray
-      chars(0) = chars(0).toUpperCase
+      chars(0) = chars(0).toUpper
       new String(chars)
     }
 
@@ -228,7 +235,7 @@ self =>
    *  @throws java.lang.IllegalArgumentException
    */
   def format(args : Any*) : String =
-    java.lang.String.format(toString, args.asInstanceOf[Seq[AnyRef]].toArray: _*)
+    java.lang.String.format(toString, args.asInstanceOf[scala.collection.Seq[AnyRef]]: _*)
 
   /** <p>
    *  Like format(args*) but takes an initial Locale parameter
@@ -245,6 +252,6 @@ self =>
    *  @throws java.lang.IllegalArgumentException
    */
   def format(l: java.util.Locale, args: Any*): String =
-    java.lang.String.format(l, toString, args.asInstanceOf[Seq[AnyRef]].toArray: _*)
+    java.lang.String.format(l, toString, args.asInstanceOf[scala.collection.Seq[AnyRef]]: _*)
 }
 

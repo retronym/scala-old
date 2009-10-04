@@ -6,15 +6,19 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: HashMap.scala 17715 2009-05-12 18:33:22Z odersky $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
+/**
+ * @since 2.8
+ */
 @serializable
-class ListMap[A, B] extends Map[A, B] with MutableMapTemplate[A, B, ListMap[A, B]] {
+class ListMap[A, B] extends Map[A, B] with MapLike[A, B, ListMap[A, B]] {
 
   
   override def empty = ListMap.empty[A, B]

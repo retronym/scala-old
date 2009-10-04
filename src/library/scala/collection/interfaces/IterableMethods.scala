@@ -6,15 +6,18 @@
 **                          |/                                          **
 \*                                                                      */
 
-package scala.collection.interfaces
+package scala.collection
+package interfaces
 
-import scala.collection._
 import generic._
 import mutable.Buffer
 import scala.reflect.ClassManifest
 import annotation.unchecked.uncheckedVariance
 
-trait IterableMethods[+A, +This <: IterableTemplate[A, This] with Iterable[A]] extends TraversableMethods[A, This]
+/**
+ * @since 2.8
+ */
+trait IterableMethods[+A, +This <: IterableLike[A, This] with Iterable[A]] extends TraversableMethods[A, This]
 {
   // abstract
   def iterator: Iterator[A]

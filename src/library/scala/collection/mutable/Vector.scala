@@ -6,24 +6,25 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
-/** A subtrait of collection.Vector which represents sequences
+/** A subtrait of <code>collection.Vector</code> which represents sequences
  *  that can be mutated.
  */
-trait Vector[A] extends Sequence[A] 
-                   with collection.Vector[A] 
-                   with TraversableClass[A, Vector]
-                   with MutableVectorTemplate[A, Vector[A]] {
-  override def companion: Companion[Vector]  = Vector
+trait Vector[A] extends Seq[A] 
+                   with scala.collection.Vector[A] 
+                   with GenericTraversableTemplate[A, Vector]
+                   with VectorLike[A, Vector[A]] {
+  override def companion: GenericCompanion[Vector]  = Vector
 }
 
-object Vector extends SequenceFactory[Vector] {
+object Vector extends SeqFactory[Vector] {
   implicit def builderFactory[A]: BuilderFactory[A, Vector[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, Vector[A]] = new ArrayBuffer
 }

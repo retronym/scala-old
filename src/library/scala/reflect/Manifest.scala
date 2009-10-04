@@ -28,6 +28,9 @@ import scala.collection.mutable._
 @serializable
 trait Manifest[T] extends ClassManifest[T] {
   override def typeArguments: List[Manifest[_]] = List()
+
+  override def arrayManifest: Manifest[Array[T]] = 
+    Manifest.classType[Array[T]](arrayClass[T](erasure))
 }
 
 /** <ps>
@@ -45,68 +48,82 @@ object Manifest {
   val Byte = new (Manifest[Byte] @serializable) {
     def erasure = java.lang.Byte.TYPE
     override def toString = "Byte"
-    override def newArray(len: Int): BoxedArray[Byte] = new BoxedByteArray(new Array[Byte](len))
+    override def newArray(len: Int): Array[Byte] = new Array[Byte](len)
     override def newWrappedArray(len: Int): WrappedArray[Byte] = new WrappedArray.ofByte(new Array[Byte](len))
+    override def newArrayBuilder(): ArrayBuilder[Byte] = new ArrayBuilder.ofByte()
   }
 
   val Short = new (Manifest[Short] @serializable) {
     def erasure = java.lang.Short.TYPE
     override def toString = "Short"
-    override def newArray(len: Int): BoxedArray[Short] = new BoxedShortArray(new Array[Short](len))
+    override def newArray(len: Int): Array[Short] = new Array[Short](len)
     override def newWrappedArray(len: Int): WrappedArray[Short] = new WrappedArray.ofShort(new Array[Short](len))
+    override def newArrayBuilder(): ArrayBuilder[Short] = new ArrayBuilder.ofShort()
   }
 
   val Char = new (Manifest[Char] @serializable) {
     def erasure = java.lang.Character.TYPE
     override def toString = "Char"
-    override def newArray(len: Int): BoxedArray[Char] = new BoxedCharArray(new Array[Char](len))
+    override def newArray(len: Int): Array[Char] = new Array[Char](len)
     override def newWrappedArray(len: Int): WrappedArray[Char] = new WrappedArray.ofChar(new Array[Char](len))
+    override def newArrayBuilder(): ArrayBuilder[Char] = new ArrayBuilder.ofChar()
   }
 
   val Int = new (Manifest[Int] @serializable) {
     def erasure = java.lang.Integer.TYPE
     override def toString = "Int"
-    override def newArray(len: Int): BoxedArray[Int] = new BoxedIntArray(new Array[Int](len))
+    override def newArray(len: Int): Array[Int] = new Array[Int](len)
     override def newWrappedArray(len: Int): WrappedArray[Int] = new WrappedArray.ofInt(new Array[Int](len))
+    override def newArrayBuilder(): ArrayBuilder[Int] = new ArrayBuilder.ofInt()
   }
 
   val Long = new (Manifest[Long] @serializable) {
     def erasure = java.lang.Long.TYPE
     override def toString = "Long"
-    override def newArray(len: Int): BoxedArray[Long] = new BoxedLongArray(new Array[Long](len))
+    override def newArray(len: Int): Array[Long] = new Array[Long](len)
     override def newWrappedArray(len: Int): WrappedArray[Long] = new WrappedArray.ofLong(new Array[Long](len))
+    override def newArrayBuilder(): ArrayBuilder[Long] = new ArrayBuilder.ofLong()
   }
 
   val Float = new (Manifest[Float] @serializable) {
     def erasure = java.lang.Float.TYPE
     override def toString = "Float"
-    override def newArray(len: Int): BoxedArray[Float] = new BoxedFloatArray(new Array[Float](len))
+    override def newArray(len: Int): Array[Float] = new Array[Float](len)
     override def newWrappedArray(len: Int): WrappedArray[Float] = new WrappedArray.ofFloat(new Array[Float](len))
+    override def newArrayBuilder(): ArrayBuilder[Float] = new ArrayBuilder.ofFloat()
   }
 
   val Double = new (Manifest[Double] @serializable) {
     def erasure = java.lang.Double.TYPE
     override def toString = "Double"
-    override def newArray(len: Int): BoxedArray[Double] = new BoxedDoubleArray(new Array[Double](len))
+    override def newArray(len: Int): Array[Double] = new Array[Double](len)
     override def newWrappedArray(len: Int): WrappedArray[Double] = new WrappedArray.ofDouble(new Array[Double](len))
+    override def newArrayBuilder(): ArrayBuilder[Double] = new ArrayBuilder.ofDouble()
   }
 
   val Boolean = new (Manifest[Boolean] @serializable) {
     def erasure = java.lang.Boolean.TYPE
     override def toString = "Boolean"
-    override def newArray(len: Int): BoxedArray[Boolean] = new BoxedBooleanArray(new Array[Boolean](len))
+    override def newArray(len: Int): Array[Boolean] = new Array[Boolean](len)
     override def newWrappedArray(len: Int): WrappedArray[Boolean] = new WrappedArray.ofBoolean(new Array[Boolean](len))
+    override def newArrayBuilder(): ArrayBuilder[Boolean] = new ArrayBuilder.ofBoolean()
   }
 
   val Unit = new (Manifest[Unit] @serializable) {
     def erasure = java.lang.Void.TYPE
     override def toString = "Unit"
-    override def newArray(len: Int): BoxedArray[Unit] = new BoxedUnitArray(new Array[Unit](len))
+    override def newArray(len: Int): Array[Unit] = new Array[Unit](len)
     override def newWrappedArray(len: Int): WrappedArray[Unit] = new WrappedArray.ofUnit(new Array[Unit](len))
+    override def newArrayBuilder(): ArrayBuilder[Unit] = new ArrayBuilder.ofUnit()
   }
 
   val Any: Manifest[Any] = new ClassTypeManifest[Any](None, classOf[java.lang.Object], List()) {
     override def toString = "Any"
+    // todo: re-implement <:<
+  }
+
+  val Object: Manifest[Object] = new ClassTypeManifest[Object](None, classOf[java.lang.Object], List()) {
+    override def toString = "Object"
     // todo: re-implement <:<
   }
 
@@ -168,6 +185,9 @@ object Manifest {
       (if (erasure.isArray) "Array" else erasure.getName) +
       argString
    }
+
+  def arrayType[T](arg: Manifest[_]): Manifest[Array[T]] = 
+    arg.asInstanceOf[Manifest[T]].arrayManifest
 
   /** Manifest for the abstract type `prefix # name'. `upperBound' is not
     * strictly necessary as it could be obtained by reflection. It was

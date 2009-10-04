@@ -6,13 +6,14 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id:$
+// $Id$
 
 package scala.actors
 
 import java.lang.ref.{Reference, WeakReference, ReferenceQueue}
 
-import scala.collection.mutable.{HashMap, HashSet}
+import scala.collection.mutable.HashSet
+import scala.actors.scheduler.TerminationMonitor
 
 /**
  * ActorGC keeps track of the number of live actors being managed by a
@@ -24,10 +25,8 @@ import scala.collection.mutable.{HashMap, HashSet}
  * (e.g. act method finishes, exit explicitly called, an exception is thrown),
  * the ActorGC is informed via the <code>terminated</code> method.
  */
-trait ActorGC extends IScheduler {
-
-  private var pendingReactions = 0
-  private val termHandlers = new HashMap[Reactor, () => Unit]
+trait ActorGC extends TerminationMonitor {
+  self: IScheduler =>
 
   /** Actors are added to refQ in newActor. */
   private val refQ = new ReferenceQueue[Reactor]
@@ -40,20 +39,20 @@ trait ActorGC extends IScheduler {
   private val refSet = new HashSet[Reference[t] forSome { type t <: Reactor }]
 
   /** newActor is invoked whenever a new actor is started. */
-  def newActor(a: Reactor) = synchronized {
+  override def newActor(a: Reactor) = synchronized {
     // registers a reference to the actor with the ReferenceQueue
     val wr = new WeakReference[Reactor](a, refQ)
     refSet += wr
-    pendingReactions += 1
+    activeActors += 1
   }
 
-  /** Removes unreachable actors from refSet. */
-  protected def gc() = synchronized {
+  /** Checks for actors that have become garbage. */
+  protected override def gc() = synchronized {
     // check for unreachable actors
     def drainRefQ() {
       val wr = refQ.poll
       if (wr != null) {
-        pendingReactions -= 1
+        activeActors -= 1
         refSet -= wr
         // continue draining
         drainRefQ()
@@ -62,50 +61,42 @@ trait ActorGC extends IScheduler {
     drainRefQ()
   }
 
+  /** Prints some status information on currently managed actors. */
   protected def status() {
     println(this+": size of refSet: "+refSet.size)
   }
 
-  protected def allTerminated: Boolean = synchronized {
-    pendingReactions <= 0
+  /** Checks whether all actors have terminated. */
+  override def allTerminated: Boolean = synchronized {
+    activeActors <= 0
   }
 
-  def onTerminate(a: Reactor)(f: => Unit) = synchronized {
-    termHandlers += (a -> (() => f))
+  override def onTerminate(a: Reactor)(f: => Unit): Unit = synchronized {
+    terminationHandlers += (a -> (() => f))
   }
 
-  /* Called only from <code>Reaction</code>.
-   */
-  def terminated(a: Reactor) = synchronized {
-    // execute registered termination handler (if any)
-    termHandlers.get(a) match {
-      case Some(handler) =>
-        handler()
-        // remove mapping
-        termHandlers -= a
-      case None =>
-        // do nothing
-    }
+  override def terminated(a: Reactor) = {
+    super.terminated(a)
 
-    // find the weak reference that points to the terminated actor, if any
-    refSet.find((ref: Reference[t] forSome { type t <: Reactor }) => ref.get() == a) match {
-      case Some(r) =>
-        // invoking clear will not cause r to be enqueued
-        r.clear()
-        refSet -= r.asInstanceOf[Reference[t] forSome { type t <: Reactor }]
-      case None =>
-        // do nothing
+    synchronized {
+      // find the weak reference that points to the terminated actor, if any
+      refSet.find((ref: Reference[t] forSome { type t <: Reactor }) => ref.get() == a) match {
+        case Some(r) =>
+          // invoking clear will not cause r to be enqueued
+          r.clear()
+          refSet -= r.asInstanceOf[Reference[t] forSome { type t <: Reactor }]
+        case None =>
+          // do nothing
+      }
     }
-
-    pendingReactions -= 1
   }
 
   private[actors] def getPendingCount = synchronized {
-    pendingReactions
+    activeActors
   }
 
   private[actors] def setPendingCount(cnt: Int) = synchronized {
-    pendingReactions = cnt
+    activeActors = cnt
   }
 
 }

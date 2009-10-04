@@ -20,9 +20,7 @@ import scala.util.control.Exception.allCatch
  */
 object ops
 {
-
-  implicit val defaultRunner: FutureTaskRunner =
-    TaskRunners.threadRunner
+  val defaultRunner: FutureTaskRunner = TaskRunners.threadRunner
 
   /**
    *  If expression computed successfully return it in <code>Right</code>,

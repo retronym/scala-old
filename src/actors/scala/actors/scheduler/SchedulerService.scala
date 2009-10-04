@@ -6,7 +6,7 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: $
+// $Id$
 
 package scala.actors
 package scheduler
@@ -23,7 +23,8 @@ import java.lang.{Runnable, Thread, InterruptedException}
  * @version 0.9.18
  * @author Philipp Haller
  */
-abstract class SchedulerService(daemon: Boolean) extends Thread with ActorGC {
+abstract class SchedulerService(daemon: Boolean) extends Thread with IScheduler with ActorGC {
+
   setDaemon(daemon)
 
   def this() =
@@ -31,19 +32,7 @@ abstract class SchedulerService(daemon: Boolean) extends Thread with ActorGC {
 
   private var terminating = false
 
-  def printActorDump {}
-
   protected val CHECK_FREQ = 100
-
-  def onLockup(handler: () => Unit) =
-    lockupHandler = handler
-
-  def onLockup(millis: Int)(handler: () => Unit) = {
-    //LOCKUP_CHECK_FREQ = millis / CHECK_FREQ
-    lockupHandler = handler
-  }
-
-  private var lockupHandler: () => Unit = null
 
   def onShutdown(): Unit
 

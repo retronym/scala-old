@@ -6,7 +6,7 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: StringBuilder.scala 16884 2009-01-09 16:52:09Z cunei $
+// $Id$
 
 
 package scala.collection.mutable
@@ -851,10 +851,8 @@ final class StringBuilder(initCapacity: Int, private val initValue: String)
 }
 
 
-object StringBuilder {
-
-  type Array[T] = scala.Array[T] // !!!
-
+object StringBuilder
+{
   private val MIN_HIGH_SURROGATE = '\uD800'
   private val MAX_HIGH_SURROGATE = '\uDBFF'
 

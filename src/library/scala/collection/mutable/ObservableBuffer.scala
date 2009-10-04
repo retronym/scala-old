@@ -9,9 +9,10 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.script._
+import script._
 
 /** This class is typically used as a mixin. It adds a subscription
  *  mechanism to the <code>Buffer</code> class into which this abstract
@@ -20,6 +21,7 @@ import scala.collection.script._
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 08/07/2003
+ *  @since   1
  */
 trait ObservableBuffer[A, This <: ObservableBuffer[A, This]] 
       extends Buffer[A]

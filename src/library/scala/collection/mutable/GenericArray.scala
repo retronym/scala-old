@@ -6,12 +6,13 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: ResizableArray.scala 18387 2009-07-24 15:28:37Z odersky $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
 /** This class is used internally to implement data structures that
  *  are based on resizable arrays.
@@ -19,15 +20,16 @@ import scala.collection.generic._
  *  @author  Matthias Zenger, Burak Emir
  *  @author Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 class GenericArray[A](override val length: Int)
 extends Vector[A] 
-   with TraversableClass[A, GenericArray]
-   with VectorTemplate[A, GenericArray[A]] { 
+   with GenericTraversableTemplate[A, GenericArray]
+   with VectorLike[A, GenericArray[A]] { 
 
-  override def companion: Companion[GenericArray] = GenericArray
+  override def companion: GenericCompanion[GenericArray] = GenericArray
 
-  var array: Array[AnyRef] = new Array[AnyRef](length)
+  val array: Array[AnyRef] = new Array[AnyRef](length)
 
   def apply(idx: Int): A = {
     if (idx >= length) throw new IndexOutOfBoundsException(idx.toString)
@@ -52,7 +54,7 @@ extends Vector[A]
   /** Copy all elements to a buffer 
    *  @param   The buffer to which elements are copied
   override def copyToBuffer[B >: A](dest: Buffer[B]) {
-    dest ++= (array: Sequence[AnyRef]).asInstanceOf[Sequence[B]]
+    dest ++= (array: Seq[AnyRef]).asInstanceOf[Seq[B]]
   }
    */
 
@@ -65,13 +67,12 @@ extends Vector[A]
   }
 }
 
-object GenericArray extends SequenceFactory[GenericArray] {
+object GenericArray extends SeqFactory[GenericArray] {
   implicit def builderFactory[A]: BuilderFactory[A, GenericArray[A], Coll] = new VirtualBuilderFactory[A]
   def newBuilder[A]: Builder[A, GenericArray[A]] = 
     new ArrayBuffer[A] mapResult { buf => 
       val result = new GenericArray[A](buf.length)
-      for (i <- 0 until buf.length) result.array(i) = buf(i).asInstanceOf[AnyRef]
-      // !!! todo: replace with    buf.copyToArray(result.array, 0)
+      buf.copyToArray(result.array.asInstanceOf[Array[Any]], 0)
       result
     }
 }

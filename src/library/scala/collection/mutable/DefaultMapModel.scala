@@ -1,7 +1,7 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
 **    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
-**  __\ \/ /__/ __ |/ /__/ __ |                                         **
+**  __\ \/ /__/ __ |/ /__/ __ |    http://www.scala-lang.org/           **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
 \*                                                                      */
@@ -9,7 +9,8 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
 /** This class is used internally. It implements the mutable <code>Map</code>
  *  class in terms of three functions: <code>findEntry</code>,
@@ -17,6 +18,7 @@ package scala.collection.mutable
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 08/07/2003
+ *  @since   1
  */
 trait DefaultMapModel[A, B] extends Map[A, B] {
 
@@ -43,4 +45,3 @@ trait DefaultMapModel[A, B] extends Map[A, B] {
   def iterator = entries map {e => (e.key, e.value)}
 
 }
-

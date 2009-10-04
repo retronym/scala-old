@@ -376,7 +376,7 @@ object Actor {
  *
  * @author Philipp Haller
  */
-@serializable
+@serializable @SerialVersionUID(-781154067877019505L)
 trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
 
   /* The following two fields are only used when the actor
@@ -390,6 +390,7 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
    * the invocation of send to the place where the thread of
    * the receiving actor resumes inside receive/receiveWithin.
    */
+  @volatile
   private var received: Option[Any] = None
 
   /* This option holds a TimerTask when the actor waits in a
@@ -398,37 +399,26 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
    */
   private var onTimeout: Option[TimerTask] = None
 
-  private class RunCallable(fun: () => Unit) extends Callable[Unit] with Runnable {
-    def call() = fun()
-    def run() = fun()
-  }
-
-  protected[this] override def makeReaction(fun: () => Unit): Runnable = {
-    if (isSuspended)
-      new RunCallable(fun)
-    else
-      new ActorTask(this, fun)
-  }
-
-  protected[this] override def resumeReceiver(item: (Any, OutputChannel[Any]), onSameThread: Boolean) {
-    if (!onTimeout.isEmpty) {
-      onTimeout.get.cancel()
-      onTimeout = None
-    }
+  private[actors] override def startSearch(msg: Any, replyTo: OutputChannel[Any], handler: Any => Boolean) =
     if (isSuspended) {
-      synchronized {
-        received = Some(item._1)
-        senders = item._2 :: senders
+      () => synchronized {
+        mailbox.append(msg, replyTo)
         resumeActor()
       }
-    } else {
-      senders = List(item._2)
-      // assert continuation != null
-      if (onSameThread)
-        continuation(item._1)
-      else
-        scheduleActor(null, item._1)
+    } else super.startSearch(msg, replyTo, handler)
+
+  private[actors] override def makeReaction(fun: () => Unit): Runnable =
+    new ActorTask(this, fun)
+
+  private[actors] override def resumeReceiver(item: (Any, OutputChannel[Any]), onSameThread: Boolean) {
+    synchronized {
+      if (!onTimeout.isEmpty) {
+        onTimeout.get.cancel()
+        onTimeout = None
+      }
     }
+    senders = List(item._2)
+    super.resumeReceiver(item, onSameThread)
   }
 
   /**
@@ -457,8 +447,9 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
           } else {
             waitingFor = f.isDefinedAt
             isSuspended = true
-            scheduler.managedBlock(new ActorBlocker(0))
-            done = true
+            scheduler.managedBlock(blocker)
+            drainSendBuffer(mailbox)
+            // keep going
           }
         }
       } else {
@@ -511,26 +502,32 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
             drainSendBuffer(mailbox)
             // keep going
             () => {}
-          } else if (msec == 0) {
+          } else if (msec == 0L) {
             done = true
             receiveTimeout
           } else {
             waitingFor = f.isDefinedAt
             received = None
             isSuspended = true
-            scheduler.managedBlock(new ActorBlocker(msec))
-            done = true
-            if (received.isEmpty) {
-              // actor is not resumed because of new message
-              // therefore, waitingFor has not been updated, yet.
-              waitingFor = waitingForNone
-              receiveTimeout
-            } else
-              () => {}
+            val thisActor = this
+            onTimeout = Some(new TimerTask {
+              def run() { thisActor.send(TIMEOUT, thisActor) }
+            })
+            Actor.timer.schedule(onTimeout.get, msec)
+            scheduler.managedBlock(blocker)
+            drainSendBuffer(mailbox)
+            // keep going
+            () => {}
           }
         }
         todo()
       } else {
+        synchronized {
+          if (!onTimeout.isEmpty) {
+            onTimeout.get.cancel()
+            onTimeout = None
+          }
+        }
         received = Some(qel.msg)
         senders = qel.session :: senders
         done = true
@@ -601,7 +598,7 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
             drainSendBuffer(mailbox)
             // keep going
             () => {}
-          } else if (msec == 0) {
+          } else if (msec == 0L) {
             done = true
             receiveTimeout
           } else {
@@ -635,7 +632,7 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
   }
 
   // guarded by lock of this
-  protected override def scheduleActor(f: PartialFunction[Any, Unit], msg: Any) =
+  private[actors] override def scheduleActor(f: PartialFunction[Any, Unit], msg: Any) =
     if ((f eq null) && (continuation eq null)) {
       // do nothing (timeout is handled instead)
     }
@@ -646,48 +643,23 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
       scheduler executeFromActor task
     }
 
-  private class ActorBlocker(timeout: Long) extends scala.concurrent.ManagedBlocker {
+  /* Used for notifying scheduler when blocking inside receive/receiveWithin. */
+  private object blocker extends scala.concurrent.ManagedBlocker {
     def block() = {
-      if (timeout > 0)
-        Actor.this.suspendActorFor(timeout)
-      else
-        Actor.this.suspendActor()
+      Actor.this.suspendActor()
       true
     }
     def isReleasable =
       !Actor.this.isSuspended
   }
 
-  private def suspendActor() {
+  private def suspendActor() = synchronized {
     while (isSuspended) {
       try {
         wait()
       } catch {
         case _: InterruptedException =>
       }
-    }
-    // links: check if we should exit
-    if (shouldExit) exit()
-  }
-
-  private def suspendActorFor(msec: Long) {
-    val ts = Platform.currentTime
-    var waittime = msec
-    var fromExc = false
-    while (isSuspended) {
-      try {
-        fromExc = false
-        wait(waittime)
-      } catch {
-        case _: InterruptedException => {
-          fromExc = true
-          val now = Platform.currentTime
-          val waited = now-ts
-          waittime = msec-waited
-          if (waittime < 0) { isSuspended = false }
-        }
-      }
-      if (!fromExc) { isSuspended = false }
     }
     // links: check if we should exit
     if (shouldExit) exit()
@@ -840,7 +812,7 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
         if (isSuspended)
           resumeActor()
         else if (waitingFor ne waitingForNone) {
-          scheduleActor(null, null)
+          scheduleActor(continuation, null)
         }
       }
   }

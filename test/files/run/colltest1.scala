@@ -55,10 +55,10 @@ object Test extends Application {
     secondFive copyToBuffer buf
     assert(buf.result == ten, buf.result)
     assert(ten.toArray.size == 10)
-    assert(ten.toArray == ten)
+    assert(ten.toArray.toSeq == ten, ten.toArray.toSeq)
     assert(ten.toIterable == ten)
     assert(ten.toList == ten)
-    assert(ten.toSequence == ten)
+    assert(ten.toSeq == ten)
     assert(ten.toStream == ten)
     assert(ten.toString endsWith "(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)")
     assert(ten.mkString("[", "; ", "]") endsWith "[1; 2; 3; 4; 5; 6; 7; 8; 9; 10]")
@@ -73,7 +73,7 @@ object Test extends Application {
     assert(six sameElements (1 to 6))
   }
 
-  def sequenceTest(empty: Sequence[Int]) {
+  def sequenceTest(empty: Seq[Int]) {
     orderedIterableTest(empty)
     val ten = empty ++ (1 to 10)
     println(ten)
@@ -125,8 +125,10 @@ object Test extends Application {
     assert((ten ++ ten).removeDuplicates == ten)
     assert(ten.patch(3, List(4, 5, 6, 7), 4) == ten)
     assert(ten.patch(0, List(1, 2, 3), 9) == List(1, 2, 3, 10))
-    assert(empty.padTo(10, 7) == Array.fill(10)(7))
+    assert(empty.padTo(10, 7) == Array.fill(10)(7).toSeq)
     assert((ten zip ten.indices) == ten.zipWithIndex)
+    assert(ten.sortWith(_ < _) == ten)
+    assert(ten.sortWith(_ > _) == ten.reverse)
   }
 
   def setTest(empty: => Set[String]) {
@@ -177,7 +179,7 @@ object Test extends Application {
     assert(m.keySet.size == 26)
     assert(m.size == 26)
     assert(m.keySet == Set() ++ m.keysIterator)
-    assert(m.keySet.toList == m.keysIterator.toList)
+    assert(m.keySet == m.keysIterator.toList.toSet, m.keySet.toList+"!="+m.keysIterator.toList.toSet)
     val m1 = empty ++ m
     val mm = m -- m.keySet.toList
     assert(mm.isEmpty, mm)
@@ -198,7 +200,7 @@ object Test extends Application {
   sequenceTest(Nil)
   sequenceTest(List())
   sequenceTest(Stream.empty)
-  sequenceTest(Array())
+  sequenceTest(Array[Int]())
   sequenceTest(mutable.ArrayBuffer())
   sequenceTest(mutable.ListBuffer())
   orderedTraversableTest(Traversable())
@@ -207,12 +209,12 @@ object Test extends Application {
   orderedIterableTest(Iterable())
   orderedIterableTest(mutable.Iterable())
   orderedIterableTest(immutable.Iterable())
-  sequenceTest(Sequence())
-  sequenceTest(mutable.Sequence())
-  sequenceTest(immutable.Sequence())
-  sequenceTest(LinearSequence())
-//  sequenceTest(mutable.LinearSequence())
-  sequenceTest(immutable.LinearSequence())
+  sequenceTest(Seq())
+  sequenceTest(mutable.Seq())
+  sequenceTest(immutable.Seq())
+  sequenceTest(LinearSeq())
+//  sequenceTest(mutable.LinearSeq())
+  sequenceTest(immutable.LinearSeq())
   sequenceTest(mutable.Vector())
   rangeTest(1 to 10)
 

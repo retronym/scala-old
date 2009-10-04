@@ -6,15 +6,14 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: TraversableLike.scala 18589 2009-08-27 14:45:35Z odersky $
+// $Id$
 
 
 package scala.collection
 import generic._
-import scala.reflect.ClassManifest
 
-// import immutable.{List, Stream, Nil} //!!!
-import mutable.{Buffer, ArrayBuffer, ListBuffer}
+import scala.reflect.ClassManifest
+import mutable.{Builder, Buffer, ArrayBuffer, ListBuffer}
 import annotation.experimental
 
 /** <p>
@@ -61,6 +60,7 @@ import annotation.experimental
  * 
  *  @author Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait TraversableLike[+A, +Repr] { 
 self =>
@@ -718,7 +718,7 @@ self =>
   /** Returns a sequence with all elements in this traversable object.
    *  @note Will not terminate for infinite-sized collections.
    */	
-  def toSequence: Sequence[A] = toList
+  def toSeq: Seq[A] = toList
  
   /** Returns a vector with all elements in this traversable object.
    *  @note Will not terminate for infinite-sized collections.

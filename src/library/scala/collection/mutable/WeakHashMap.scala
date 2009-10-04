@@ -6,13 +6,17 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: Symbol.scala 17537 2009-04-20 18:37:37Z odersky $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.JavaConversions._
+import JavaConversions._
 
+/**
+ * @since 2.8
+ */
 class WeakHashMap[A, B] extends JMapWrapper[A, B](new java.util.WeakHashMap) {
   override def empty = new WeakHashMap[A, B]
 }

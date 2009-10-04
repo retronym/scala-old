@@ -8,8 +8,8 @@
 
 // $Id$
 
-package scala.collection.generic
-import scala.collection._ 
+package scala.collection
+package generic 
 
 /** This class represents collections that can be augmented using a `+=` operator
  *  and that can be cleared of all elements using the `clear` method.
@@ -17,6 +17,7 @@ import scala.collection._
  *  @author   Martin Odersky
  *  @owner   Martin Odersky
  *  @version 2.8
+ *  @since   2.8
  */
 trait Growable[-A] { 
 

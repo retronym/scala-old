@@ -2,7 +2,7 @@
  * Copyright 2005-2009 LAMP/EPFL
  * @author  Martin Odersky
  */
-// $Id: Parsers.scala 15004 2008-05-13 16:37:33Z odersky $
+// $Id$
 //todo: allow infix type patterns
 
 
@@ -480,7 +480,7 @@ trait JavaParsers extends JavaScanners {
       if (in.token == DOTDOTDOT) {
         in.nextToken
         t = atPos(t.pos) {
-          AppliedTypeTree(scalaDot(nme.REPEATED_PARAM_CLASS_NAME.toTypeName), List(t))
+          AppliedTypeTree(scalaDot(nme.JAVA_REPEATED_PARAM_CLASS_NAME.toTypeName), List(t))
         }
       }
      varDecl(in.currentPos, Modifiers(Flags.JAVA | Flags.PARAM), t, ident())
@@ -543,7 +543,7 @@ trait JavaParsers extends JavaScanners {
                   atPos(pos) {
                     New(rootId(nme.AnnotationDefaultATTR.toTypeName), List(List()))
                   }
-                mods1 = Modifiers(mods1.flags, mods1.privateWithin, annot :: mods1.annotations)
+                mods1 = Modifiers(mods1.flags, mods1.privateWithin, annot :: mods1.annotations, mods1.positions)
                 skipTo(SEMI)
                 accept(SEMI)
                 blankExpr
@@ -633,9 +633,29 @@ trait JavaParsers extends JavaScanners {
         Import(Ident(cdef.name.toTermName), List((nme.WILDCARD, null)))
       }
 
-    // create companion object even if it has no statics, so import A._ works; bug #1700
-    def addCompanionObject(statics: List[Tree], cdef: ClassDef): List[Tree] = 
-      List(makeCompanionObject(cdef, statics), importCompanionObject(cdef), cdef)
+    // Importing the companion object members cannot be done uncritically: see
+    // ticket #2377 wherein a class contains two static inner classes, each of which
+    // has a static inner class called "Builder" - this results in an ambiguity error
+    // when each performs the import in the enclosing class's scope.
+    //
+    // To address this I moved the import Companion._ inside the class, as the first
+    // statement.  This should work without compromising the enclosing scope, but may (?)
+    // end up suffering from the same issues it does in scala - specifically that this
+    // leaves auxiliary constructors unable to access members of the companion object
+    // as unqualified identifiers.
+    def addCompanionObject(statics: List[Tree], cdef: ClassDef): List[Tree] = {      
+      def implWithImport(importStmt: Tree) = {
+        import cdef.impl._
+        treeCopy.Template(cdef.impl, parents, self, importStmt :: body)
+      }
+      // if there are no statics we can use the original cdef, but we always
+      // create the companion so import A._ is not an error (see ticket #1700)
+      val cdefNew =
+        if (statics.isEmpty) cdef
+        else treeCopy.ClassDef(cdef, cdef.mods, cdef.name, cdef.tparams, implWithImport(importCompanionObject(cdef)))
+      
+      List(makeCompanionObject(cdefNew, statics), cdefNew)
+    }
 
     def importDecl(): List[Tree] = {
       accept(IMPORT)

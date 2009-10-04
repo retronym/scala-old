@@ -3,7 +3,7 @@
 <project name="sabbus" default="build">
 
   <description>
-    SuperSabbus for Scala core, builds the scala library and compiler. It can also package it as a simple distribution, tests it for stable bootstrapping and against the Scala test suite. Use PackSabbus to package it for different install management tools such as Sbaz.
+SuperSabbus for Scala core, builds the scala library and compiler. It can also package it as a simple distribution, tests it for stable bootstrapping and against the Scala test suite.
   </description>
 
 <!-- ===========================================================================
@@ -12,11 +12,16 @@ END-USER TARGETS
   
   <target name="build" depends="pack.done"
     description="Builds the Scala compiler and library. Executables are in 'build/pack/bin'."/>
-  <target name="build.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="build"/>
+    
+  <target name="build-opt"
+    description="Builds the optimised Scala compiler and library. Executables are in 'build/pack/bin'.">
+    <antcall target="build"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>
   </target>
-  <target name="optimise" depends="build.optimise"/>
+    
+  <target name="build.optimise"><antcall target="build"/></target> <!-- for compat, remove when unused -->
+  <target name="optimise"><antcall target="build"/></target> <!-- for compat, remove when unused -->
 
   <target name="clean" depends="quick.clean"
     description="Removes binaries of compiler and library. Distributions are untouched."/>
@@ -24,8 +29,9 @@ END-USER TARGETS
   <target name="test" depends="test.done"
     description="Runs test suite and bootstrapping test on Scala compiler and library."/>
   <target name="test.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="test"/>
+    <antcall target="test"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>
   </target>
 
   <target name="docs" depends="docs.done"
@@ -43,23 +49,29 @@ END-USER TARGETS
     <antcall target="docs.clean"/>
     <antcall target="all.done"/>
   </target>
-  <target name="dist.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="dist"/>
+  
+  <target name="dist-opt"
+    description="Makes a new optimised distribution and tests it. Will remove existing binaries and documentation.">
+    <antcall target="dist"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>
   </target>
+  
+  <target name="dist.optimise"><antcall target="optdist"/></target> <!-- for compat, remove when unused -->
   
   <target name="fastdist" depends="dist.done"
     description="Makes a new distribution without testing it or removing partially build elements"/>
   <target name="fastdist.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="fastdist"/>
+    <antcall target="fastdist"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>
   </target>
 
   <target name="distclean" depends="dist.clean"
     description="Removes all distributions. Binaries and documentation are untouched."/>
   
-  <target name="newstarr"
-    description="Replaces the Starr compiler and library by one built from current sources and tests it.">
+  <target name="replacestarr"
+    description="Replaces the Starr compiler and library by fresh ones built from current sources and tests them.">
     <fail message="This target is not available on Windows. Use 'ant newstarrwin' instead.">
       <condition>
         <os family="windows"/>
@@ -71,15 +83,20 @@ END-USER TARGETS
     <antcall target="locker.clean"/>
     <antcall target="test.done"/>
   </target>
-  <target name="newstarr.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="newstarr"/>
+  
+  <target name="replacestarr-opt"
+    description="Replaces the Starr compiler and library by fresh, optimised ones built from current sources and tests them.">
+    <antcall target="newstarr"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>
   </target>
+  
+  <target name="newstarr.optimise"><antcall target="optnewstarr"/></target> <!-- for compat, remove when unused -->
 
   <!-- Ant on Windows is not able to delete jar files that are referenced in any <path>.
        See ticket 1290 on trac. -->
   <target name="newstarrwin"
-          description="Creates a new Starr on Windows. Manually execute 'ant locker.clean build' first!">
+    description="Creates a new Starr on Windows. Manually execute 'ant locker.clean build' first!">
     <fail message="This target is only available on Windows. Use 'ant newstarr' instead.">
       <condition>
         <not><os family="windows"/></not>
@@ -91,29 +108,35 @@ END-USER TARGETS
     <antcall target="test.done"/>
   </target>
   
-  <target name="freshlocker"
-    description="Replaces the Locker compiler and library by one built from current sources.">
+  <target name="replacelocker"
+    description="Replaces the Locker compiler and library by fresh ones built from current sources.">
     <antcall target="palo.clean"/>
-    <antcall target="palo.done"/>
+    <antcall target="unlocklocker"/>
   </target>
   <target name="freshlocker.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="freshlocker"/>
+    <antcall target="freshlocker"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>    
   </target>
+  
+  <target name="replacelocker-opt"
+    description="Replaces the Locker compiler and library by fresh, optimised ones built from current sources.">
+    <antcall target="replacelocker"> 
+      <param name="scalac.args.optimise" value="-optimise"/>
+    </antcall>    
+  </target>
+  
+  <target name="newlocker.optimise"><antcall target="replacelocker"/></target> <!-- for compat, remove when unused -->
 
-  <target name="newlocker"
-    description="Unlocks the Locker compiler and library and lets them be updated by Scalac.">
+  <target name="unlocklocker"
+    description="Unlocks Locker, allowing its compiler and library to be rebuilt">
     <antcall target="locker.unlock"/>
     <antcall target="palo.done"/>
   </target>
-  <target name="newlocker.optimise">
-    <property name="scalac.args.optimise" value="-optimise"/>
-    <antcall target="newlocker"/>
-  </target>
 
   <target name="newlibs"
-          description="Forces compiler libraries (MSIL) to be rebuilt. Add this target before any other if class file format is incompatible.">
-    <property name="libs.msil.outdated" value="yes"/>
+    description="Requires compiler libraries (MSIL and FJBG) to be rebuilt. Add this target before any other if class file format is incompatible.">
+    <property name="libs.outdated" value="yes"/>
   </target>
 
 <!-- ===========================================================================
@@ -166,6 +189,7 @@ PROPERTIES
   <!-- if ANT_OPTS is already set by the environment, it will be unaltered,
        but if it is unset it will take this default value. -->
   <property name="env.ANT_OPTS" value="-Xms512M -Xmx1024M -Xss1M -XX:MaxPermSize=128M" />
+  <!--  to find max heap usage: -Xaprof ; currently at 980M for locker.comp -->
 
   <property
       name="scalacfork.jvmargs"
@@ -179,6 +203,7 @@ INITIALISATION
 ============================================================================ -->
 
   <target name="init">
+  <!-- The scalac.args.optimise is selectively overridden in certain antcall tasks. -->
     <property name="scalac.args.optimise" value=""/>
     <property name="scalac.args.all" value="${scalac.args} ${scalac.args.optimise}"/>
   <!-- Setting-up Ant contrib tasks -->
@@ -349,7 +374,7 @@ LOCAL REFERENCE BUILD (LOCKER)
     <delete dir="${build-locker.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
   </target>
   
-  <target name="locker.unlock" depends="quick.clean">
+  <target name="locker.unlock">
     <delete file="${build-locker.dir}/all.complete"/>
     <delete file="${build-locker.dir}/library.complete"/>
     <delete file="${build-locker.dir}/compiler.complete"/>
@@ -512,13 +537,14 @@ QUICK BUILD (QUICK)
     <stopwatch name="quick.lib.timer" action="total"/>
   </target>
   
-  <target name="quick.newlibs" depends="quick.lib" if="libs.msil.outdated">
-    <antcall target="libs.done"/>
-    <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
-    <property name="msil.jar" value="${build-libs.dir}/msil.jar"/>
+  <target name="quick.newlibs" depends="quick.lib" if="libs.outdated">
+    <antcall target="libs.done">
+      <param name="fjbg.jar" value="${build-libs.dir}/fjbg.jar"/>
+      <param name="msil.jar" value="${build-libs.dir}/msil.jar"/>
+    </antcall>
   </target>
   
-  <target name="quick.libs" depends="quick.newlibs" unless="libs.msil.outdated">
+  <target name="quick.libs" depends="quick.newlibs" unless="libs.outdated">
     <property name="fjbg.jar" value="${lib.dir}/fjbg.jar"/>
     <property name="msil.jar" value="${lib.dir}/msil.jar"/>
   </target>
@@ -1121,7 +1147,53 @@ LIBRARIES (MSIL, FJBG maybe later)
     </jar>
   </target>
   
-  <target name="libs.done" depends="libs.msilpack"/>
+  <target name="libs.pre-fjbg" depends="libs.start">
+    <uptodate property="libs.fjbg.available" targetfile="${build-libs.dir}/fjbg.complete">
+      <srcfiles dir="${src.dir}/fjbg">
+        <include name="**/*.java"/>
+        <include name="**/*.scala"/>
+      </srcfiles>
+    </uptodate>
+  </target>
+  
+  <target name="libs.fjbg" depends="libs.pre-fjbg" unless="libs.fjbg.available">
+    <mkdir dir="${build-libs.dir}/classes/fjbg"/>
+    <javac
+      srcdir="${src.dir}/fjbg"
+      destdir="${build-libs.dir}/classes/fjbg"
+      classpath="${build-libs.dir}/classes/fjbg"
+      includes="**/*.java"
+      target="1.5" source="1.4">
+        <compilerarg line="${javac.args}"/>
+    </javac>
+    <!-- For now, JFBG is written in pure Java
+    <scalacfork
+      destdir="${build-libs.dir}/classes/fjbg"
+      compilerpathref="locker.classpath"
+      srcpath="${src.dir}/fjbg"
+      params="${scalac.args.all}"
+      srcdir="${src.dir}/fjbg"
+      jvmargs="${scalacfork.jvmargs}">
+      <include name="**/*.scala"/>
+      <compilationpath>
+        <pathelement location="${build-quick.dir}/classes/library"/>
+        <pathelement location="${build-libs.dir}/classes/fjbg"/>
+      </compilationpath>
+    </scalacfork>
+    -->
+    <touch file="${build-libs.dir}/fjbg.complete" verbose="no"/>
+  </target>
+  
+  <target name="libs.pre-fjbgpack" depends="libs.fjbg">
+  </target>
+  
+  <target name="libs.fjbgpack" depends="libs.pre-fjbgpack" unless="libs.fjbgpack.available">
+    <jar destfile="${build-libs.dir}/fjbg.jar">
+      <fileset dir="${build-libs.dir}/classes/fjbg"/>
+    </jar>
+  </target>
+  
+  <target name="libs.done" depends="libs.msilpack, libs.fjbgpack"/>
 
   <target name="libs.clean" depends="pack.clean">
     <delete dir="${build-libs.dir}" includeemptydirs="yes" quiet="yes" failonerror="no"/>
@@ -1439,31 +1511,67 @@ STABLE REFERENCE (STARR)
     <delete file="${basedir}/lib/scala-library-src.jar"/>
   </target>
 
-  <target name="starr.lib" depends="starr.clean">
+  <target name="starr.lib" depends="starr.start">
     <copy file="${basedir}/build/pack/lib/scala-library.jar"
-          toFile="${basedir}/lib/scala-library.jar"/>
+          toFile="${basedir}/lib/scala-library.jar"
+          overwrite="yes"/>
   </target>
 
   <target name="starr.comp" depends="starr.lib">
+    <delete file="${basedir}/lib/scala-compiler.jar"/>
     <jar destfile="${basedir}/lib/scala-compiler.jar">
       <fileset dir="${basedir}/build/quick/classes/compiler"/>
     </jar>
   </target>
 
   <target name="starr.src" depends="starr.comp">
+    <delete file="${basedir}/lib/scala-library-src.jar"/>
     <jar destfile="${basedir}/lib/scala-library-src.jar">
       <fileset dir="${basedir}/src/library"/>
       <fileset dir="${basedir}/src/actors"/>
     </jar>
   </target>
 
-  <target name="starr.libs" depends="starr.src" if="libs.msil.outdated">
+  <target name="starr.libs" depends="starr.src" if="libs.outdated">
     <copy toDir="${lib.dir}" overwrite="yes">
-      <fileset dir="${build-libs.dir}" includes="*.jar"/>
+      <fileset dir="${build-libs.dir}">
+        <include name="fjbg.jar"/>
+        <include name="msil.jar"/>
+      </fileset>
     </copy>
   </target>
 
   <target name="starr.done" depends="starr.libs"/>
+
+<!-- ===========================================================================
+FORWARDED TARGETS FOR JVM 1.5 BUILD
+============================================================================ -->
+  
+  <target name="five" depends="pack.done">
+    <ant antfile="${src.dir}/build/five.xml" target="five.done" inheritall="yes" inheritrefs="yes"/>
+  </target>
+
+  <target name="fivepack" depends="pack.done">
+    <ant antfile="${src.dir}/build/five.xml" target="five-pack.done" inheritall="yes" inheritrefs="yes"/>
+  </target>
+
+  <target name="fiveclean" depends="pack.done">
+    <ant antfile="${src.dir}/build/five.xml" target="five.clean" inheritall="yes" inheritrefs="yes"/>
+  </target>
+
+  <target name="fivetest" depends="pack.done">
+    <ant antfile="${src.dir}/build/five.xml" target="five-test.done" inheritall="yes" inheritrefs="yes"/>
+  </target>
+
+  <target name="fivedist" depends="pack.done">
+    <ant antfile="${src.dir}/build/five.xml" target="five-all.done" inheritall="yes" inheritrefs="yes"/>
+  </target>
+
+<!--
+  <target name="fourclean">
+    <ant antfile="${src.dir}/build/four.xml" target="four-all.clean" inheritall="yes" inheritrefs="yes"/>
+  </target>
+-->
 
 <!-- ===========================================================================
 FORWARDED TARGETS FOR MSIL BUILD
@@ -1505,8 +1613,14 @@ FORWARDED TARGETS FOR NIGHTLY BUILDS
 ============================================================================ -->
 
   <target name="nightly">
-    <!-- disabled until problems are fixed <property name="scalac.args.optimise" value="-optimise"/> -->
-    <antcall target="all.done"/>
+    <antcall target="nightly-nopt">
+      <!-- disabled until problems are fixed -->
+      <!-- <param name="scalac.args.optimise" value="-optimise"/> -->
+    </antcall>
+  </target>
+
+  <target name="nightly-nopt" depends="all.done">
+    <!-- cannot antcall all.done, the properties defined in there (dist.dir) are not returned. need depends. -->
     <ant antfile="${src.dir}/build/pack.xml" target="pack-all.done" inheritall="yes" inheritrefs="yes"/>
   </target>
 

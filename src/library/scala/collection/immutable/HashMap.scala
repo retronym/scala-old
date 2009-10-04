@@ -9,28 +9,34 @@
 // $Id$
 
 
-package scala.collection.immutable
+package scala.collection
+package immutable
 
-import scala.collection.generic._
-import scala.collection.mutable
+import generic._
 import annotation.unchecked.uncheckedVariance
 
-/** This class implements immutable maps using a hash table.
- * It is optimized for sequential accesses where the last updated table is accessed most often.
- * It supports with reasonable efficiency accesses to previous versions of the table by keeping
- * a change log that's regularly compacted.
- * It needs to synchronize most methods, so it is less suitable for highly concurrent accesses.
+/** <p>
+ *    This class implements immutable maps using a hash table.
+ *  </p>
+ *  <p>
+ *    It is optimized for sequential accesses where the last updated table is
+ *    accessed most often. It supports with reasonable efficiency accesses to
+ *    previous versions of the table by keeping a change log that's regularly
+ *    compacted. It needs to synchronize most methods, so it is less suitable
+ *    for highly concurrent accesses.
+ *  </p>
  *
  * @note the builder of a hash map returns specialized representations EmptyMap,Map1,..., Map4
  * for maps of size <= 4.
  *
  *  @author  Martin Odersky
  *  @version 2.0, 19/01/2007
+ *  @since   2.3
  */
-@serializable
-class HashMap[A, +B] extends Map[A,B] with ImmutableMapTemplate[A, B, HashMap[A, B]] with mutable.HashTable[A] {
+@serializable @SerialVersionUID(8886909077084990906L)
+class HashMap[A, +B] extends Map[A,B] with MapLike[A, B, HashMap[A, B]] with mutable.HashTable[A] {
 
-  type Entry = collection.mutable.DefaultEntry[A, Any]
+  type Entry = scala.collection.mutable.DefaultEntry[A, Any]
 
   protected var later: HashMap[A, B @uncheckedVariance] = null
   protected var oldKey: A = _
@@ -174,6 +180,7 @@ class HashMap[A, +B] extends Map[A,B] with ImmutableMapTemplate[A, B, HashMap[A,
  *
  *  @author  Martin Odersky
  *  @version 2.8
+ *  @since   2.3
  */
 object HashMap extends ImmutableMapFactory[HashMap] {
   implicit def builderFactory[A, B]: BuilderFactory[(A, B), HashMap[A, B], Coll] = new MapBuilderFactory[A, B]

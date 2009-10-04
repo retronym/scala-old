@@ -9,7 +9,7 @@ package scala.tools.nsc
 package util
 import scala.tools.nsc.io.{AbstractFile, VirtualFile}
 import scala.collection.mutable.ArrayBuffer
-import annotation.tailrec
+import annotation.{ tailrec, switch }
 
 object SourceFile {
   // Be very careful touching these.
@@ -22,7 +22,7 @@ object SourceFile {
   final val CR = '\u000D'
   final val SU = '\u001A'
 
-  def isLineBreakChar(c: Int) = c match {
+  @inline def isLineBreakChar(c: Char) = (c: @switch) match {
     case LF|FF|CR|SU  => true
     case _            => false
   }
@@ -53,7 +53,7 @@ abstract class SourceFile {
     (content drop offset) startsWith text
 
   def lineToString(index: Int): String =
-    content drop lineToOffset(index) takeWhile (c => !isLineBreakChar(c)) mkString
+    content drop lineToOffset(index) takeWhile (c => !isLineBreakChar(c.toChar)) mkString
     
   @tailrec
   final def skipWhitespace(offset: Int): Int =  
@@ -94,10 +94,11 @@ class BatchSourceFile(val file : AbstractFile, val content: Array[Char]) extends
     }
   
   def isLineBreak(idx: Int) =
-    if (idx >= length) false else content(idx) match {
+    if (idx >= length) false else {
+      val ch = content(idx)
       // don't identify the CR in CR LF as a line break, since LF will do.
-      case CR => (idx + 1 == length) || (content(idx + 1) != LF)
-      case x  => isLineBreakChar(x)
+      if (ch == CR) (idx + 1 == length) || (content(idx + 1) != LF)
+      else isLineBreakChar(ch)
     }
     
   private lazy val lineIndices: Array[Int] = {
@@ -176,7 +177,7 @@ extends BatchSourceFile(name, contents)
     this(
       name,
       components.toList,
-      Array.concat(components.toList.map(comp => 
+      Array.concat(components.map(comp => 
         CompoundSourceFile.stripSU(comp.content).toArray):_*))
   }
 

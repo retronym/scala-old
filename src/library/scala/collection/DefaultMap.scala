@@ -6,7 +6,7 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: Map.scala 17537 2009-04-20 18:37:37Z odersky $
+// $Id$
 
 
 package scala.collection
@@ -28,6 +28,8 @@ import generic._
  *    It might also be advisable to override <code>foreach</code> or
  *    <code>size</code> if efficient implementations can be found.
  *  </p>
+ *
+ *  @since 2.8
  */
 trait DefaultMap[A, +B] extends Map[A, B] { self =>
 

@@ -6,11 +6,15 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: DefaultEntry.scala 17680 2009-05-08 16:33:15Z odersky $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
+/**
+ * @since 2.8
+ */
 @serializable
 final class LinkedEntry[A, B](val key: A, var value: B)
       extends HashEntry[A, LinkedEntry[A, B]] {

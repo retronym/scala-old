@@ -84,7 +84,7 @@ abstract class OverridingPairs {
           fillDecls(bcs.tail, deferredflag)
           var e = bcs.head.info.decls.elems;
           while (e ne null) {
-            if (e.sym.getFlag(DEFERRED) == deferredflag && !exclude(e.sym))
+            if (e.sym.getFlag(DEFERRED) == deferredflag.toLong && !exclude(e.sym))
               decls enter e.sym;
             e = e.next
           }
@@ -172,7 +172,14 @@ abstract class OverridingPairs {
           do { 
             do {
               nextEntry = decls.lookupNextEntry(nextEntry);
-            } while ((nextEntry ne null) &&
+              /* DEBUG
+              if ((nextEntry ne null) &&
+                  !(nextEntry.sym hasFlag PRIVATE) &&
+                  !(overriding.owner == nextEntry.sym.owner) &&
+                  !matches(overriding, nextEntry.sym))
+                println("skipping "+overriding+":"+self.memberType(overriding)+overriding.locationString+" to "+nextEntry.sym+":"+self.memberType(nextEntry.sym)+nextEntry.sym.locationString)
+              */
+              } while ((nextEntry ne null) &&
                      ((nextEntry.sym hasFlag PRIVATE) ||
                       (overriding.owner == nextEntry.sym.owner) ||
                       (!matches(overriding, nextEntry.sym)) ||

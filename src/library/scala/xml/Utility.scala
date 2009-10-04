@@ -87,7 +87,7 @@ object Utility extends AnyRef with parsing.TokenTests
   object Escapes {
     /** For reasons unclear escape and unescape are a long ways from
         being logical inverses. */
-    private val pairs = List(
+    val pairs = Map(
       "lt"    -> '<',
       "gt"    -> '>',
       "amp"   -> '&',
@@ -96,10 +96,10 @@ object Utility extends AnyRef with parsing.TokenTests
       // is valid xhtml but not html, and IE doesn't know it, says jweb
       // "apos"  -> '\''
     )
-    val escMap    = Map((for ((s, c) <- pairs) yield (c, "&%s;" format s)) : _*)
-    val unescMap  = Map(("apos"  -> '\'') :: pairs : _*)
+    val escMap    = pairs map { case (s, c) => c-> ("&%s;" format s) }
+    val unescMap  = pairs ++ Map("apos"  -> '\'')
   }
-  import Escapes._
+  import Escapes.{ escMap, unescMap }
   
   /**
    * Appends escaped string to <code>s</code>.
@@ -292,7 +292,7 @@ object Utility extends AnyRef with parsing.TokenTests
   def getName(s: String, index: Int): String = {
     if (index >= s.length) null
     else (s drop index) match {
-      case Seq(x, xs @ _*) if isNameStart(x)  => (Array(x) ++ (xs takeWhile isNameChar)).mkString
+      case Seq(x, xs @ _*) if isNameStart(x)  => x.toString + (xs takeWhile isNameChar).mkString
       case _                                  => ""
     }
   }
@@ -331,45 +331,44 @@ object Utility extends AnyRef with parsing.TokenTests
    * @return      ...
    */
   def parseAttributeValue(value: String): Seq[Node] = {
-    val zs: Seq[Char] = value
     val sb  = new StringBuilder
     var rfb: StringBuilder = null
     val nb = new NodeBuffer()
-    val it = zs.iterator
+    
+    val it = value.iterator
     while (it.hasNext) {
       var c = it.next
-      c match {
-        case '&' => // entity! flush buffer into text node
-          it.next match {
-            case '#' =>
-              c = it.next
-              val theChar = parseCharRef ({ ()=> c },{ () => c = it.next },{s => throw new RuntimeException(s)})
-              sb.append(theChar)
-
-            case x =>
-              if (rfb eq null) rfb = new StringBuilder()
-              rfb.append(x)
-              c = it.next
-              while (c != ';') {
-                rfb.append(c)
-                c = it.next
-              }
-              val ref = rfb.toString() 
-              rfb.setLength(0)
-              unescape(ref,sb) match {
-                case null => 
-                  if (sb.length > 0) {          // flush buffer
-                    nb += Text(sb.toString())
-                    sb.setLength(0)
-                  }
-                  nb += EntityRef(sb.toString()) // add entityref
-                case _ =>
-              }
+      // entity! flush buffer into text node
+      if (c == '&') {
+        c = it.next
+        if (c == '#') {
+          c = it.next
+          val theChar = parseCharRef ({ ()=> c },{ () => c = it.next },{s => throw new RuntimeException(s)})
+          sb.append(theChar)
+        }
+        else {
+          if (rfb eq null) rfb = new StringBuilder()
+          rfb append c
+          c = it.next
+          while (c != ';') {
+            rfb.append(c)
+            c = it.next
           }
-        case x   => 
-          sb.append(x)
+          val ref = rfb.toString() 
+          rfb.setLength(0)
+          unescape(ref,sb) match {
+            case null => 
+              if (sb.length > 0) {          // flush buffer
+                nb += Text(sb.toString())
+                sb.setLength(0)
+              }
+              nb += EntityRef(sb.toString()) // add entityref
+            case _ =>
+          }
+        }
       }
-    } 
+      else sb append c
+    }
     if (sb.length > 0) { // flush buffer
       val x = Text(sb.toString())
       if (nb.length == 0)

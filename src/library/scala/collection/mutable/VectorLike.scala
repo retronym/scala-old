@@ -6,15 +6,17 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: MutableVectorTemplate.scala 18387 2009-07-24 15:28:37Z odersky $
+// $Id$
 
 
 package scala.collection
 package mutable
 import generic._
 
-/** A subtrait of collection.Vector which represents sequences
+/** A subtrait of scala.collection.Vector which represents sequences
  *  that can be mutated.
+ *
+ *  @since 2.8
  */
 trait VectorLike[A, +Repr] extends scala.collection.VectorLike[A, Repr] { self =>
 
@@ -25,7 +27,7 @@ trait VectorLike[A, +Repr] extends scala.collection.VectorLike[A, Repr] { self =
 
   /** Creates a view of this iterable @see Iterable.View
    */
-  override def view = new MutableVectorView[A, Repr] { 
+  override def view = new VectorView[A, Repr] { 
     protected lazy val underlying = self.repr
     override def iterator = self.iterator
     override def length = self.length

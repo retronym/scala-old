@@ -2,7 +2,7 @@
  * Copyright 2005-2009 LAMP/EPFL
  * @author  Martin Odersky
  */
-// $Id: Scanners.scala 17285 2009-03-11 13:51:56Z rytz $
+// $Id$
 package scala.tools.nsc
 package ast.parser
 
@@ -11,6 +11,7 @@ import SourceFile.{LF, FF, CR, SU}
 import Tokens._
 import scala.annotation.switch
 import scala.collection.mutable.{ListBuffer, ArrayBuffer}
+import scala.xml.Utility.{ isNameStart }
 
 trait Scanners {
   val global : Global
@@ -264,7 +265,7 @@ trait Scanners {
           val last = if (charOffset >= 2) buf(charOffset - 2) else ' '
           nextChar()
           last match {
-            case ' '|'\t'|'\n'|'{'|'('|'>' if xml.Parsing.isNameStart(ch) || ch == '!' || ch == '?' =>
+            case ' '|'\t'|'\n'|'{'|'('|'>' if isNameStart(ch) || ch == '!' || ch == '?' =>
               token = XMLSTART
             case _ =>
               // Console.println("found '<', but last is '"+in.last+"'"); // DEBUG
@@ -711,18 +712,32 @@ trait Scanners {
       if (base <= 10 && ch == '.') {
         val lookahead = lookaheadReader
         lookahead.nextChar()
+        def restOfNumber() = {
+          putChar(ch)
+          nextChar()
+          getFraction()
+        }
+        
         lookahead.ch match {
-          case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | 
-               '8' | '9' | 'd' | 'D' | 'e' | 'E' | 'f' | 'F' =>
-            putChar(ch)
-            nextChar()
-            return getFraction()
+          case '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
+            return restOfNumber()
+          
+          /** These letters may be part of a literal, or a method invocation on an Int */
+          case 'd' | 'D' | 'f' | 'F' =>
+            lookahead.nextChar()
+            if (!isIdentifierPart(lookahead.ch))
+              return restOfNumber()
+
+          /** A little more special handling for e.g. 5e7 */
+          case 'e' | 'E' =>
+            lookahead.nextChar()
+            val ch = lookahead.ch
+            if (!isIdentifierPart(ch) || (ch >= '0' && ch <= '9') || ch == '+' || ch == '-')
+              return restOfNumber()
+            
           case _ =>
-            if (!isIdentifierStart(lookahead.ch)) {
-              putChar(ch)
-              nextChar()
-              return getFraction()
-            }
+            if (!isIdentifierStart(lookahead.ch))
+              return restOfNumber()
         }
       }
       if (base <= 10 && 
@@ -840,7 +855,7 @@ trait Scanners {
 
   def isSpecial(c: Char) = {
     val chtp = Character.getType(c)
-    chtp == Character.MATH_SYMBOL || chtp == Character.OTHER_SYMBOL
+    chtp == Character.MATH_SYMBOL.toInt || chtp == Character.OTHER_SYMBOL.toInt
   }
 
   def isOperatorPart(c : Char) : Boolean = (c: @switch) match {

@@ -6,15 +6,19 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: ArrayBuffer.scala 18387 2009-07-24 15:28:37Z odersky $
+// $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 import scala.reflect.ClassManifest
 
-/** A builder class for arrays */
+/** A builder class for arrays
+ *
+ *  @since 2.8
+ */
 class WrappedArrayBuilder[A](manifest: ClassManifest[A]) extends Builder[A, WrappedArray[A]] {
 
   private var elems: WrappedArray[A] = _

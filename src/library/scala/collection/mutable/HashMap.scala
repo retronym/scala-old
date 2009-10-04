@@ -9,14 +9,17 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
-import scala.collection.generic._
+import generic._
 
-
-@serializable
+/**
+ * @since 1
+ */
+@serializable @SerialVersionUID(-8682987922734091219L)
 class HashMap[A, B] extends Map[A, B] 
-                       with MutableMapTemplate[A, B, HashMap[A, B]] 
+                       with MapLike[A, B, HashMap[A, B]] 
                        with HashTable[A] {
 
   override def empty: HashMap[A, B] = HashMap.empty[A, B]

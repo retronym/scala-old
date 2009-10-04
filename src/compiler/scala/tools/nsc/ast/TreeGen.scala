@@ -273,8 +273,14 @@ abstract class TreeGen
   def mkModuleAccessDcl(accessor: Symbol) = 
     DefDef(accessor setFlag lateDEFERRED, EmptyTree)
 
-  def mkRuntimeCall(meth: Name, args: List[Tree]): Tree =
+  def mkRuntimeCall(meth: Name, args: List[Tree]): Tree = {
+    assert(meth.toString != "boxArray") // !!! can be removed once arrays are in.
     Apply(Select(mkAttributedRef(ScalaRunTimeModule), meth), args)
+  }
+
+  def mkRuntimeCall(meth: Name, targs: List[Type], args: List[Tree]): Tree = {
+    Apply(TypeApply(Select(mkAttributedRef(ScalaRunTimeModule), meth), targs map TypeTree), args)
+  }
 
   /** Make a synchronized block on 'monitor'. */
   def mkSynchronized(monitor: Tree, body: Tree): Tree =     
@@ -285,7 +291,7 @@ abstract class TreeGen
 
   def paramToArg(vparam: Symbol) = {
     val arg = Ident(vparam)
-    if (vparam.tpe.typeSymbol == RepeatedParamClass) wildcardStar(arg)
+    if (isRepeatedParamType(vparam.tpe)) wildcardStar(arg)
     else arg
   }
 
@@ -301,9 +307,10 @@ abstract class TreeGen
     
   /** Used in situations where you need to access value of an expression several times
    */
-  def evalOnce(expr: Tree, owner: Symbol, unit: CompilationUnit)(within: (() => Tree) => Tree): Tree =
+  def evalOnce(expr: Tree, owner: Symbol, unit: CompilationUnit)(within: (() => Tree) => Tree): Tree = {
+    var used = false
     if (treeInfo.isPureExpr(expr)) {
-      within(() => expr);
+      within(() => if (used) expr.duplicate else { used = true; expr })
     } else {
       val temp = owner.newValue(expr.pos.makeTransparent, unit.fresh.newName(expr.pos, "ev$"))
         .setFlag(SYNTHETIC).setInfo(expr.tpe)
@@ -311,19 +318,26 @@ abstract class TreeGen
       ensureNonOverlapping(containing, List(expr))
       Block(List(ValDef(temp, expr)), containing) setPos (containing.pos union expr.pos)
     }
+  }
 
   def evalOnceAll(exprs: List[Tree], owner: Symbol, unit: CompilationUnit)(within: (List[() => Tree]) => Tree): Tree = {
     val vdefs = new ListBuffer[ValDef]
     val exprs1 = new ListBuffer[() => Tree]
+    val used = new Array[Boolean](exprs.length)
+    var i = 0
     for (expr <- exprs) {
       if (treeInfo.isPureExpr(expr)) {
-        exprs1 += (() => expr)
+        exprs1 += {
+          val idx = i
+          () => if (used(idx)) expr.duplicate else { used(idx) = true; expr }
+        }
       } else {
         val temp = owner.newValue(expr.pos.makeTransparent, unit.fresh.newName(expr.pos, "ev$"))
           .setFlag(SYNTHETIC).setInfo(expr.tpe)
         vdefs += ValDef(temp, expr)
         exprs1 += (() => Ident(temp) setPos temp.pos.focus setType expr.tpe)
       }
+      i += 1
     }
     val prefix = vdefs.toList
     val containing = within(exprs1.toList)

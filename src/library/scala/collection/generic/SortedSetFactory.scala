@@ -9,12 +9,16 @@
 // $Id$
 
 
-package scala.collection.generic
-import scala.collection._
+package scala.collection
+package generic
+
+import mutable.Builder
 
 /** A template for companion objects of Set and subclasses thereof.
+ *
+ *  @since 2.8
  */
-abstract class SortedSetFactory[CC[A] <: SortedSet[A] with SortedSetTemplate[A, CC[A]]] {
+abstract class SortedSetFactory[CC[A] <: SortedSet[A] with SortedSetLike[A, CC[A]]] {
   type Coll = CC[_]
 
   def newBuilder[A](implicit ord: Ordering[A]): Builder[A, CC[A]]

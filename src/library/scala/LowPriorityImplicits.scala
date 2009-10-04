@@ -6,45 +6,58 @@
 **                          |/                                          **
 \*                                                                      */
 
-// $Id: Predef.scala 18558 2009-08-24 14:03:30Z moors $
+// $Id$
 
 
 package scala
 
 import collection.mutable._
-import collection.immutable.WrappedString
+import collection.immutable.{WrappedString, Vector}
+import collection.generic.BuilderFactory
 
-/** The `LowPriorityImplicits` class provides implicit values that are
- *  valid in all Scala compilation units without explicit qualification, but that
- *  are partially overridden by higher-priority conmversions in Predef
+/** The `LowPriorityImplicits` class provides implicit values that
+ *  are valid in all Scala compilation units without explicit qualification,
+ *  but that are partially overridden by higher-priority conversions in object
+ *  `Predef`.
+ *
+ *  @author  Martin Odersky
+ *  @since 2.8
  */
 class LowPriorityImplicits {
 
-  implicit def genericArrayWrapper[T](xs: Array[T]): WrappedArray[T] = (xs: AnyRef) match { // !!! drop the AnyRef and get unreachable code errors!
-    case x: Array[AnyRef] => arrayWrapper[AnyRef](x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Int] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Double] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Long] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Float] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Char] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Byte] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Short] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Boolean] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-    case x: Array[Unit] => arrayWrapper(x).asInstanceOf[WrappedArray[T]]
-  }
+  implicit def genericWrapArray[T](xs: Array[T]): WrappedArray[T] = 
+    WrappedArray.make(xs)
 
-  implicit def arrayWrapper[T <: AnyRef](xs: Array[T]): WrappedArray[T] = new WrappedArray.ofRef[T](xs.asInstanceOf[Array[AnyRef]])
-  implicit def arrayWrapper(xs: Array[Int]): WrappedArray[Int] = new WrappedArray.ofInt(xs)
-  implicit def arrayWrapper(xs: Array[Double]): WrappedArray[Double] = new WrappedArray.ofDouble(xs)
-  implicit def arrayWrapper(xs: Array[Long]): WrappedArray[Long] = new WrappedArray.ofLong(xs)
-  implicit def arrayWrapper(xs: Array[Float]): WrappedArray[Float] = new WrappedArray.ofFloat(xs)
-  implicit def arrayWrapper(xs: Array[Char]): WrappedArray[Char] = new WrappedArray.ofChar(xs)
-  implicit def arrayWrapper(xs: Array[Byte]): WrappedArray[Byte] = new WrappedArray.ofByte(xs)
-  implicit def arrayWrapper(xs: Array[Short]): WrappedArray[Short] = new WrappedArray.ofShort(xs)
-  implicit def arrayWrapper(xs: Array[Boolean]): WrappedArray[Boolean] = new WrappedArray.ofBoolean(xs)
-  implicit def arrayWrapper(xs: Array[Unit]): WrappedArray[Unit] = new WrappedArray.ofUnit(xs)
+  implicit def wrapRefArray[T <: AnyRef](xs: Array[T]): WrappedArray[T] = new WrappedArray.ofRef[T](xs)
+  implicit def wrapIntArray(xs: Array[Int]): WrappedArray[Int] = new WrappedArray.ofInt(xs)
+  implicit def wrapDoubleArray(xs: Array[Double]): WrappedArray[Double] = new WrappedArray.ofDouble(xs)
+  implicit def wrapLongArray(xs: Array[Long]): WrappedArray[Long] = new WrappedArray.ofLong(xs)
+  implicit def wrapFloatArray(xs: Array[Float]): WrappedArray[Float] = new WrappedArray.ofFloat(xs)
+  implicit def wrapCharArray(xs: Array[Char]): WrappedArray[Char] = new WrappedArray.ofChar(xs)
+  implicit def wrapByteArray(xs: Array[Byte]): WrappedArray[Byte] = new WrappedArray.ofByte(xs)
+  implicit def wrapShortArray(xs: Array[Short]): WrappedArray[Short] = new WrappedArray.ofShort(xs)
+  implicit def wrapBooleanArray(xs: Array[Boolean]): WrappedArray[Boolean] = new WrappedArray.ofBoolean(xs)
+  implicit def wrapUnitArray(xs: Array[Unit]): WrappedArray[Unit] = new WrappedArray.ofUnit(xs)
 
   implicit def wrapString(s: String): WrappedString = new WrappedString(s)
   implicit def unwrapString(ws: WrappedString): String = ws.self
+
+  implicit def fallbackStringBuilderFactory[T]: BuilderFactory[T, collection.immutable.Vector[T], String] = 
+    new BuilderFactory[T, collection.immutable.Vector[T], String] { 
+      def apply(from: String) = scala.collection.immutable.Vector.newBuilder[T]
+    }
+
+  /** Can go away after next newstarr */
+  def wrapArray[T <: AnyRef](xs: Array[T]): WrappedArray[T] = new WrappedArray.ofRef[T](xs)
+  def wrapArray(xs: Array[Int]): WrappedArray[Int] = new WrappedArray.ofInt(xs)
+  def wrapArray(xs: Array[Double]): WrappedArray[Double] = new WrappedArray.ofDouble(xs)
+  def wrapArray(xs: Array[Long]): WrappedArray[Long] = new WrappedArray.ofLong(xs)
+  def wrapArray(xs: Array[Float]): WrappedArray[Float] = new WrappedArray.ofFloat(xs)
+  def wrapArray(xs: Array[Char]): WrappedArray[Char] = new WrappedArray.ofChar(xs)
+  def wrapArray(xs: Array[Byte]): WrappedArray[Byte] = new WrappedArray.ofByte(xs)
+  def wrapArray(xs: Array[Short]): WrappedArray[Short] = new WrappedArray.ofShort(xs)
+  def wrapArray(xs: Array[Boolean]): WrappedArray[Boolean] = new WrappedArray.ofBoolean(xs)
+  def wrapArray(xs: Array[Unit]): WrappedArray[Unit] = new WrappedArray.ofUnit(xs)
+
 
 }

@@ -11,6 +11,8 @@
 
 package scala.runtime;
 
+import java.io.*;
+
 /** An object (static class) that defines methods used for creating,
   * reverting, and calculating with, boxed values. There are four classes
   * of methods in this object:
@@ -25,8 +27,8 @@ package scala.runtime;
   * @author  Martin Odersky
   * @contributor Stepan Koltsov
   * @version 2.0 */
-public class BoxesRunTime {
-
+public class BoxesRunTime
+{    
     private static final int CHAR = 0, BYTE = 1, SHORT = 2, INT = 3, LONG = 4, FLOAT = 5, DOUBLE = 6, OTHER = 7;
     
     private static int typeCode(Object a) {
@@ -47,7 +49,30 @@ public class BoxesRunTime {
     }
     
     public static Character boxToCharacter(char c) {
-        return Character.valueOf(c); 
+        // !!! Temporarily working around the "impossible" (?) fact that
+        // c can have a negative value here.  In any revision since r17461 try:
+        //   def foo = new (Short => Char) { def apply(x: Short) = x.toChar }
+        //   foo(-100)
+        // and the -100 will get to Character, which will duly crash.
+        // The bug was masked before because the Characters were created
+        // with "new Character(c)", but now the static method uses the argument
+        // as an index into a cache array, which can't be negative.
+        //
+        // It appears to be Short-specific; I can't get anything similar
+        // out of Byte or Int.
+        Character ret;
+        
+        // straightforward workarounds like bitmasking do not seem to
+        // work here; is java optimizing out "impossible" tests/ops? I
+        // don't know, but this is the safe way:
+        try {
+          ret = Character.valueOf(c);
+        }
+        catch (ArrayIndexOutOfBoundsException e) {
+          ret = new Character(c);
+        }
+        
+        return ret;
     }
     
     public static Byte boxToByte(byte b) {
@@ -107,17 +132,220 @@ public class BoxesRunTime {
     public static double unboxToDouble(Object d) {
         return d == null ? 0.0d : ((Double)d).doubleValue();
     }
-        
-/* COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON */
+    
+    /* COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON ... COMPARISON */
+    
+    /** These methods manually implement "overloading" among boxed primitives.
+     *  The compiler is capable of inserting (but does not presently) the specific
+     *  equals method based on the statically known types of the boxes.
+     */
 
-    /** A rich implementation of the <code>equals</code> method that overrides the
-      * default equals because Java's boxed primitives are utterly broken. This equals
-      * is inserted instead of a normal equals by the Scala compiler (in the
-      * ICode phase, method <code>genEqEqPrimitive</code>) only when either
-      * side of the comparison is a subclass of <code>AnyVal</code>, of
-      * <code>java.lang.Number</code>, of <code>java.lang.Character</code> or
-      * is exactly <code>Any</code> or <code>AnyRef</code>. */
+    public static boolean equalsCharacterCharacter(Character a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.charValue();
+    }
+    public static boolean equalsCharacterByte(Character a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.byteValue();
+    }
+    public static boolean equalsCharacterShort(Character a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.shortValue();
+    }
+    public static boolean equalsCharacterInteger(Character a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.intValue();
+    }
+    public static boolean equalsCharacterLong(Character a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.longValue();
+    }
+    public static boolean equalsCharacterFloat(Character a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.floatValue();
+    }
+    public static boolean equalsCharacterDouble(Character a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.charValue() == b.doubleValue();
+    }
+    public static boolean equalsByteCharacter(Byte a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.charValue();
+    }
+    public static boolean equalsByteByte(Byte a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.byteValue();
+    }
+    public static boolean equalsByteShort(Byte a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.shortValue();
+    }
+    public static boolean equalsByteInteger(Byte a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.intValue();
+    }
+    public static boolean equalsByteLong(Byte a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.longValue();
+    }
+    public static boolean equalsByteFloat(Byte a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.floatValue();
+    }
+    public static boolean equalsByteDouble(Byte a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.byteValue() == b.doubleValue();
+    }
+    public static boolean equalsShortCharacter(Short a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.charValue();
+    }
+    public static boolean equalsShortByte(Short a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.byteValue();
+    }
+    public static boolean equalsShortShort(Short a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.shortValue();
+    }
+    public static boolean equalsShortInteger(Short a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.intValue();
+    }
+    public static boolean equalsShortLong(Short a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.longValue();
+    }
+    public static boolean equalsShortFloat(Short a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.floatValue();
+    }
+    public static boolean equalsShortDouble(Short a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.shortValue() == b.doubleValue();
+    }
+    public static boolean equalsIntegerCharacter(Integer a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.charValue();
+    }
+    public static boolean equalsIntegerByte(Integer a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.byteValue();
+    }
+    public static boolean equalsIntegerShort(Integer a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.shortValue();
+    }
+    public static boolean equalsIntegerInteger(Integer a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.intValue();
+    }
+    public static boolean equalsIntegerLong(Integer a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.longValue();
+    }
+    public static boolean equalsIntegerFloat(Integer a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.floatValue();
+    }
+    public static boolean equalsIntegerDouble(Integer a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.intValue() == b.doubleValue();
+    }
+    public static boolean equalsLongCharacter(Long a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.charValue();
+    }
+    public static boolean equalsLongByte(Long a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.byteValue();
+    }
+    public static boolean equalsLongShort(Long a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.shortValue();
+    }
+    public static boolean equalsLongInteger(Long a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.intValue();
+    }
+    public static boolean equalsLongLong(Long a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.longValue();
+    }
+    public static boolean equalsLongFloat(Long a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.floatValue();
+    }
+    public static boolean equalsLongDouble(Long a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.longValue() == b.doubleValue();
+    }
+    public static boolean equalsFloatCharacter(Float a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.charValue();
+    }
+    public static boolean equalsFloatByte(Float a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.byteValue();
+    }
+    public static boolean equalsFloatShort(Float a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.shortValue();
+    }
+    public static boolean equalsFloatInteger(Float a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.intValue();
+    }
+    public static boolean equalsFloatLong(Float a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.longValue();
+    }
+    public static boolean equalsFloatFloat(Float a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.floatValue();
+    }
+    public static boolean equalsFloatDouble(Float a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.floatValue() == b.doubleValue();
+    }
+    public static boolean equalsDoubleCharacter(Double a, Character b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.charValue();
+    }
+    public static boolean equalsDoubleByte(Double a, Byte b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.byteValue();
+    }
+    public static boolean equalsDoubleShort(Double a, Short b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.shortValue();
+    }
+    public static boolean equalsDoubleInteger(Double a, Integer b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.intValue();
+    }
+    public static boolean equalsDoubleLong(Double a, Long b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.longValue();
+    }
+    public static boolean equalsDoubleFloat(Double a, Float b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.floatValue();
+    }
+    public static boolean equalsDoubleDouble(Double a, Double b) {
+        if (a == null || b == null) return (Object)a == (Object)b;
+        else return a.doubleValue() == b.doubleValue();
+    }    
+    
+    /** The current equals method, whose logic is under review. **/
+    
     public static boolean equals(Object a, Object b) {
+        if ((a instanceof Number || a instanceof Character) && (b instanceof Number || b instanceof Character)) {
+          if (a.getClass() != b.getClass()) {
+            Equality.logInternal("[ BOXED ] Comparing: ", a, b, Equality.whereAreWe());
+          }
+        }
+      
         if (a == null || b == null)
             return a == b;
         if (a.equals(b))
@@ -126,28 +354,36 @@ public class BoxesRunTime {
             int acode = typeCode(a);
             int bcode = typeCode(b);
             int maxcode = (acode < bcode) ? bcode : acode;
+            boolean res = false;
             if (maxcode <= INT) {
                 int aa = (acode == CHAR) ? ((Character) a).charValue() : ((Number) a).intValue();
                 int bb = (bcode == CHAR) ? ((Character) b).charValue() : ((Number) b).intValue();
-                return aa == bb;
+                res = (aa == bb);
             }
             if (maxcode <= LONG) {
                 long aa = (acode == CHAR) ? ((Character) a).charValue() : ((Number) a).longValue();
                 long bb = (bcode == CHAR) ? ((Character) b).charValue() : ((Number) b).longValue();
-                return aa == bb;
+                res = (aa == bb);
             }
             if (maxcode <= FLOAT) {
                 float aa = (acode == CHAR) ? ((Character) a).charValue() : ((Number) a).floatValue();
                 float bb = (bcode == CHAR) ? ((Character) b).charValue() : ((Number) b).floatValue();
-                return aa == bb;
+                res = (aa == bb);
             }
             if (maxcode <= DOUBLE) {
                 double aa = (acode == CHAR) ? ((Character) a).charValue() : ((Number) a).doubleValue();
                 double bb = (bcode == CHAR) ? ((Character) b).charValue() : ((Number) b).doubleValue();
-                return aa == bb;
+                res = (aa == bb);
             }
             
-            return b.equals(a);
+            if (res || b.equals(a)) {
+              String msg;
+              if (res) msg = "[ BOXED ] Overriding equals between different types: ";
+              else msg = "[ BOXED ] Overriding equals because b.equals(a): ";              
+              Equality.logInternal(msg, a, b, Equality.whereAreWe());
+              return true;
+            }
+            return false; 
         }
         return false;
     }

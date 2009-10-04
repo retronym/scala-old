@@ -9,7 +9,8 @@
 // $Id$
 
 
-package scala.collection.mutable
+package scala.collection
+package mutable
 
 
 /** This is a synchronized version of the <code>Queue[T]</code> class. It
@@ -18,9 +19,10 @@ package scala.collection.mutable
  *
  *  @author  Matthias Zenger
  *  @version 1.0, 03/05/2004
+ *  @since   1
  */
 class SynchronizedQueue[A] extends Queue[A] {
-  import collection.Traversable
+  import scala.collection.Traversable
 
   /** Checks if the queue is empty.
    *

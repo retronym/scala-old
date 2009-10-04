@@ -8,6 +8,7 @@
 
 // $Id$
 
+
 package scala.collection
 
 /** <p>
@@ -48,6 +49,7 @@ package scala.collection
  *  </p>
  * 
  *  @author Miles Sabin
+ *  @since  2.8
  */
 object JavaConversions {
   import java.{ lang => jl, util => ju }
@@ -390,7 +392,7 @@ object JavaConversions {
 
   }
   
-  case class JSetWrapper[A](underlying : ju.Set[A]) extends mutable.Set[A] with generic.MutableSetTemplate[A, JSetWrapper[A]] {
+  case class JSetWrapper[A](underlying : ju.Set[A]) extends mutable.Set[A] with mutable.SetLike[A, JSetWrapper[A]] {
     override def size = underlying.size
 
     def iterator = underlying.iterator
@@ -460,7 +462,7 @@ object JavaConversions {
     }
   }
   
-  case class JMapWrapper[A, B](underlying : ju.Map[A, B]) extends mutable.Map[A, B] with generic.MutableMapTemplate[A, B, JMapWrapper[A, B]] {
+  case class JMapWrapper[A, B](underlying : ju.Map[A, B]) extends mutable.Map[A, B] with mutable.MapLike[A, B, JMapWrapper[A, B]] {
     override def size = underlying.size
     
     def get(k : A) = {
