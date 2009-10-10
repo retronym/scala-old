@@ -27,7 +27,7 @@ self: Analyzer =>
   import global._
   import definitions._
 
-  final val traceImplicits = false
+  def traceImplicits = printTypings
 
   var implicitTime = 0L  
   var inscopeSucceed = 0L
@@ -120,6 +120,68 @@ self: Analyzer =>
 
   /** A sentinel indicating no implicit was found */
   val NoImplicitInfo = new ImplicitInfo(null, NoType, NoSymbol)
+
+  /** A constructor for types ?{ name: tp }, used in infer view to member
+   *  searches.
+   */
+  def memberWildcardType(name: Name, tp: Type) = {
+    val result = refinedType(List(WildcardType), NoSymbol)
+    var psym = if (name.isTypeName) result.typeSymbol.newAbstractType(NoPosition, name) 
+               else result.typeSymbol.newValue(NoPosition, name)
+    psym setInfo tp
+    result.decls enter psym
+    result
+  }
+
+  /** An extractor for types of the form ? { name: ? }
+   */
+  object HasMember {
+    def apply(name: Name): Type = memberWildcardType(name, WildcardType)
+    def unapply(pt: Type): Option[Name] = pt match {
+      case RefinedType(List(WildcardType), decls) =>
+        decls.toList match {
+          case List(sym) if (sym.tpe == WildcardType) => Some(sym.name)
+          case _ => None
+        }
+      case _ =>
+        None
+    }
+  }
+
+  /** An extractor for types of the form ? { name: (? >: argtpe <: Any*)restp }
+   */
+  object HasMethodMatching {
+    def apply(name: Name, argtpes: List[Type], restpe: Type): Type = {
+      def templateArgType(argtpe: Type) =
+        new BoundedWildcardType(mkTypeBounds(argtpe, AnyClass.tpe))
+      val dummyMethod = new TermSymbol(NoSymbol, NoPosition, "typer$dummy")
+      val mtpe = MethodType(dummyMethod.newSyntheticValueParams(argtpes map templateArgType), restpe)
+      memberWildcardType(name, mtpe)
+    }
+    def unapply(pt: Type): Option[(Name, List[Type], Type)] = pt match {
+      case RefinedType(List(WildcardType), decls) =>
+        decls.toList match {
+          case List(sym) =>
+            sym.tpe match {
+              case MethodType(params, restpe) 
+              if (params forall (_.tpe.isInstanceOf[BoundedWildcardType])) => 
+                Some((sym.name, params map (_.tpe.bounds.lo), restpe))
+              case _ => None
+            }
+          case _ => None
+        }
+      case _ => None
+    }
+  }
+
+  /** An extractor for unary function types arg => res
+   */
+  object Function1 {
+    def unapply(tp: Type) = tp match {
+      case TypeRef(_, sym, List(arg, res)) if (sym == FunctionClass(1)) => Some(arg, res)
+      case _ => None
+    }
+  }
 
   /** A class that sets up an implicit search. For more info, see comments for `inferImplicit`.
    *  @param tree             The tree for which the implicit needs to be inserted.
@@ -291,16 +353,39 @@ self: Analyzer =>
        */
       val wildPt = approximate(pt)
 
-      //if (traceImplicits) println("typed impl for "+wildPt+"? "+info.name+":"+info.tpe+"/"+undetParams)
+      /** Does type `tp' match expected type `pt'
+       *  This is the case if either `pt' is a unary function type with a
+       *  HasMethodMatching type as result, and `tp' is a unary function
+       *  or method type whose result type has a method whose name and type
+       *  correspond to the HasMethodMatching type,
+       *  or otherwise if `tp' is compatible with `pt'.
+       */
+      def matchesPt(tp: Type, pt: Type, undet: List[Symbol]) = 
+        isCompatible(tp, pt) || {
+          pt match {
+            case Function1(arg, HasMethodMatching(name, argtpes, restpe)) =>
+              normalize(tp) match {
+                case Function1(arg1, res1) =>
+                  (arg <:< arg1) && 
+                  (res1.member(name) filter (m => isApplicableSafe(undet, m.tpe, argtpes, restpe))) != NoSymbol
+                case _ =>
+                  false
+              }
+            case _ =>
+              false
+          }
+        }
+
+      if (traceImplicits) println("typed impl for "+wildPt+"? "+info.name+":"+depoly(info.tpe)+"/"+undetParams+"/"+isPlausiblyCompatible(info.tpe, wildPt)+"/"+matchesPt(depoly(info.tpe), wildPt, List()))
       if (isPlausiblyCompatible(info.tpe, wildPt) && 
-          isCompatible(depoly(info.tpe), wildPt) && 
+          matchesPt(depoly(info.tpe), wildPt, List()) && 
           isStable(info.pre)) {
 
         val itree = atPos(tree.pos.focus) {
           if (info.pre == NoPrefix) Ident(info.name) 
           else Select(gen.mkAttributedQualifier(info.pre), info.name)
         } 
-        //if (traceImplicits) println("typed impl?? "+info.name+":"+info.tpe+" ==> "+itree+" with "+wildPt)
+        if (traceImplicits) println("typed impl?? "+info.name+":"+info.tpe+" ==> "+itree+" with pt = "+pt+", wildpt = "+wildPt)
         def fail(reason: String): SearchResult = {
           if (settings.XlogImplicits.value)
             inform(itree+" is not a valid implicit value for "+pt+" because:\n"+reason)
@@ -333,10 +418,11 @@ self: Analyzer =>
           if (itree2.tpe.isError) SearchFailure
           else if (hasMatchingSymbol(itree1)) {
             val tvars = undetParams map freshVar
-            if (isCompatible(itree2.tpe, pt.instantiateTypeParams(undetParams, tvars))) {
+            if (matchesPt(itree2.tpe, pt.instantiateTypeParams(undetParams, tvars), undetParams)) {
               if (traceImplicits) println("tvars = "+tvars+"/"+(tvars map (_.constr)))
               val targs = solvedTypes(tvars, undetParams, undetParams map varianceInType(pt),
                                       false, lubDepth(List(itree2.tpe, pt)))
+              checkBounds(itree2.pos, NoPrefix, NoSymbol, undetParams, targs, "inferred ") // #2421        
               val subst = new TreeTypeSubstituter(undetParams, targs)
               subst traverse itree2 
               // todo: remove type params that have been instantiated to Nothing, similar
@@ -346,7 +432,7 @@ self: Analyzer =>
               // println("RESULT = "+itree+"///"+itree1+"///"+itree2)//DEBUG
               result
             } else {
-              if (traceImplicits) println("incompatible???")
+              if (traceImplicits) println("incompatible: "+itree2.tpe+" does not match "+pt.instantiateTypeParams(undetParams, tvars))
               SearchFailure
             }
           } else if (settings.XlogImplicits.value) 
@@ -667,20 +753,6 @@ self: Analyzer =>
       }
 
       mot(tp)
-    }
-
-    /** An extractor for types of the form ? { name: ? }
-     */
-    object WildcardName {
-      def unapply(pt: Type): Option[Name] = pt match {
-        case RefinedType(List(WildcardType), decls) =>
-          decls.toList match {
-            case List(sym) if (sym.tpe == WildcardType) => Some(sym.name)
-            case _ => None
-          }
-        case _ =>
-          None
-      }
     }
 
     /** The result of the implicit search:

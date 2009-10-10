@@ -19,14 +19,9 @@ trait TreeDSL {
   import definitions._
   import gen.{ scalaDot }
   
-  object CODE {
-    // clarity aliases    
-    type TreeFunction1 = Tree => Tree
-    type TreeFunction2 = (Tree, Tree) => Tree
-    type BooleanTreeFunction2 = (Tree, Tree) => Boolean
-    
+  object CODE {    
     // Add a null check to a Tree => Tree function
-    def nullSafe[T](f: TreeFunction1, ifNull: Tree): TreeFunction1 =
+    def nullSafe[T](f: Tree => Tree, ifNull: Tree): Tree => Tree =
       tree => IF (tree MEMBER_== NULL) THEN ifNull ELSE f(tree)
 
     // XXX these two are in scala.PartialFunction now, just have to
@@ -190,6 +185,8 @@ trait TreeDSL {
       def IS_DEFINED() =
         if (target.tpe.typeSymbol == SomeClass) TRUE   // is Some[_]
         else NOT(ID(target) DOT nme.isEmpty)           // is Option[_]
+      
+      def GET() = fn(ID(target), nme.get)
       
       // name of nth indexed argument to a method (first parameter list), defaults to 1st
       def ARG(idx: Int = 0) = Ident(target.paramss.head(idx))

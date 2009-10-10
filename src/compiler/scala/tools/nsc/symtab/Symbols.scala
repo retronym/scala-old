@@ -1479,14 +1479,20 @@ trait Symbols {
     override def toString(): String =
       if (isValueParameter && owner.isSetter)
         "parameter of setter "+owner.nameString
-      else if (isPackageObjectClass)
-        "package object "+nameString
+      else if (isPackageObject || isPackageObjectClass)
+        "package object "+owner.nameString
       else 
         compose(List(kindString, 
                      if (isClassConstructor) owner.simpleName.decode+idString else nameString))
 
+    /** If owner is a package object, its owner, else the normal owner.
+     */
+    def ownerSkipPackageObject = 
+      if (owner.isPackageObjectClass) owner.owner else owner
+
     /** String representation of location. */
-    def locationString: String =
+    def locationString: String = {
+      val owner = ownerSkipPackageObject
       if (owner.isClass &&
           ((!owner.isAnonymousClass && 
             !owner.isRefinementClass && 
@@ -1494,6 +1500,7 @@ trait Symbols {
             !owner.isRoot &&
             !owner.isEmptyPackageClass) || settings.debug.value))
         " in " + owner else ""
+    }
 
     /** String representation of symbol's definition following its name */
     final def infoString(tp: Type): String = {

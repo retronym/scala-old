@@ -399,6 +399,8 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
    */
   private var onTimeout: Option[TimerTask] = None
 
+  protected[actors] override def scheduler: IScheduler = Scheduler
+
   private[actors] override def startSearch(msg: Any, replyTo: OutputChannel[Any], handler: Any => Boolean) =
     if (isSuspended) {
       () => synchronized {
@@ -684,10 +686,8 @@ trait Actor extends AbstractActor with ReplyReactor with ReplyableActor {
     exiting = false
     shouldExit = false
 
-    scheduler execute {
-      scheduler.newActor(Actor.this)
-      (new Reaction(Actor.this)).run()
-    }
+    scheduler.newActor(this)
+    scheduler.execute(new Reaction(this))
 
     this
   }

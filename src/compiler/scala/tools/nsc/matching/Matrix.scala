@@ -8,14 +8,16 @@ package matching
 
 import transform.ExplicitOuter
 import util.Position
+import symtab.Flags
 
-trait Matrix extends PatternOptimizer {
+trait Matrix extends MatrixAdditions {
   self: ExplicitOuter with ParallelMatching =>
 
   import global.{ typer => _, _ }
   import analyzer.Typer
   import CODE._
-  
+  import Debug._
+
   /** Translation of match expressions.
    *
    *  `p':  pattern
@@ -81,12 +83,12 @@ trait Matrix extends PatternOptimizer {
   )
 
   case class MatrixContext(
-    handleOuter: TreeFunction1,   // Tree => Tree function 
+    handleOuter: Tree => Tree,    // for outer pointer
     typer: Typer,                 // a local typer
     owner: Symbol,                // the current owner
     matchResultType: Type)        // the expected result type of the whole match
       extends Squeezer
-  {  
+  {
     def newVar(
       pos: Position,
       tpe: Type,
@@ -95,20 +97,13 @@ trait Matrix extends PatternOptimizer {
     {
       val n: Name = if (name == null) newName(pos, "temp") else name
       // careful: pos has special meaning 
-      owner.newVariable(pos, n) setInfo tpe setFlag (0L /: flags)(_|_)
+      val res = owner.newVariable(pos, n) setInfo tpe setFlag (0L /: flags)(_|_)
+      
+      traceCategory("newVar", "%s: %s", res, tpe)
+      res
     }
     
-    def typedValDef(x: Symbol, rhs: Tree) = {
-      val finalRhs = x.tpe match {
-        case WildcardType   =>
-          rhs setType null
-          x setInfo (typer typed rhs).tpe
-          rhs
-        case _              =>
-          typer.typed(rhs, x.tpe)
-      }
-      typer typed (VAL(x) === finalRhs)
-    }
+    def typedValDef(x: Symbol, rhs: Tree) =
+      tracing("typedVal", typer typedValDef (VAL(x) === rhs))
   }
-
 }

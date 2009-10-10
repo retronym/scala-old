@@ -1085,8 +1085,13 @@ trait Namers { self: Analyzer =>
      * @param namer is the namer of the module class (the comp. obj)
      */
     def addApplyUnapply(cdef: ClassDef, namer: Namer) {
-      if (!(cdef.symbol hasFlag ABSTRACT))
-        namer.enterSyntheticSym(caseModuleApplyMeth(cdef))
+      if (!(cdef.symbol hasFlag ABSTRACT)) {
+        val applyMethod = caseModuleApplyMeth(cdef)
+        if (applyMethod.vparamss.size > 2)
+          context.error(cdef.symbol.pos, "case classes limited by implementation: maximum of 2 constructor parameter lists.")
+                  
+        namer.enterSyntheticSym(applyMethod)
+      }
       namer.enterSyntheticSym(caseModuleUnapplyMeth(cdef))
     }
 
@@ -1177,17 +1182,17 @@ trait Namers { self: Analyzer =>
                 }
                 true
               }
-              def checkSelectors(selectors: List[(Name, Name)]): Unit = selectors match {
-                case (from, to) :: rest =>
+              def checkSelectors(selectors: List[ImportSelector]): Unit = selectors match {
+                case ImportSelector(from, _, to, _) :: rest =>
                   if (from != nme.WILDCARD && base != ErrorType) {
                     if (base.member(from) == NoSymbol && base.member(from.toTypeName) == NoSymbol)
                       context.error(tree.pos, from.decode + " is not a member of " + expr);
                     if (checkNotRedundant(tree.pos, from, to))
                       checkNotRedundant(tree.pos, from.toTypeName, to.toTypeName)
                   }
-                  if (from != nme.WILDCARD && (rest.exists (sel => sel._1 == from)))
+                  if (from != nme.WILDCARD && (rest.exists (sel => sel.name == from)))
                     context.error(tree.pos, from.decode + " is renamed twice");
-                  if ((to ne null) && to != nme.WILDCARD && (rest exists (sel => sel._2 == to)))
+                  if ((to ne null) && to != nme.WILDCARD && (rest exists (sel => sel.rename == to)))
                     context.error(tree.pos, to.decode + " appears twice as a target of a renaming");
                   checkSelectors(rest)
                 case Nil => 

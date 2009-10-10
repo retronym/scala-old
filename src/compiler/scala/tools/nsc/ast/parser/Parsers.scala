@@ -1889,11 +1889,13 @@ self =>
         } else {
           t = id
         }
+        t setPos t.pos.makeTransparent
       }
       def loop(): Tree =
         if (in.token == USCORE) {
+          val uscoreOffset = in.offset
           in.nextToken()
-          Import(t, List((nme.WILDCARD, null)))
+          Import(t, List(ImportSelector(nme.WILDCARD, uscoreOffset, null, -1)))
         } else if (in.token == LBRACE) {
           Import(t, importSelectors())
         } else {
@@ -1903,10 +1905,11 @@ self =>
             t = atPos(start, if (name == nme.ERROR) in.offset else nameOffset) {
               Select(t, name)
             }
+            t setPos t.pos.makeTransparent
             in.nextToken()
             loop()
           } else {
-            Import(t, List((name, name)))
+            Import(t, List(ImportSelector(name, nameOffset, name, nameOffset)))
           }
         }
       atPos(start) { loop() }
@@ -1914,8 +1917,8 @@ self =>
       
     /** ImportSelectors ::= `{' {ImportSelector `,'} (ImportSelector | `_') `}'
      */
-    def importSelectors(): List[(Name, Name)] = {
-      val names = new ListBuffer[(Name, Name)]
+    def importSelectors(): List[ImportSelector] = {
+      val names = new ListBuffer[ImportSelector]
       accept(LBRACE)
       var isLast = importSelector(names)
       while (!isLast && in.token == COMMA) {
@@ -1928,19 +1931,31 @@ self =>
 
     /** ImportSelector ::= Id [`=>' Id | `=>' `_']
      */
-    def importSelector(names: ListBuffer[(Name, Name)]): Boolean =
+    def importSelector(names: ListBuffer[ImportSelector]): Boolean =
       if (in.token == USCORE) {
-        in.nextToken(); names += ((nme.WILDCARD, null)); true
+        val uscoreOffset = in.offset
+        in.nextToken(); names += ImportSelector(nme.WILDCARD, uscoreOffset, null, -1); true
       } else {
+        val nameOffset = in.offset
         val name = ident()
-        names += ((
-          name,
+        
+        val (name1, name1Offset) =
           if (in.token == ARROW) {
             in.nextToken()
-            if (in.token == USCORE) { in.nextToken(); nme.WILDCARD } else ident()
+            if (in.token == USCORE) {
+              val uscoreOffset = in.offset
+              in.nextToken();
+              (nme.WILDCARD, uscoreOffset)
+            } else {
+              val renameOffset = in.offset
+              val rename = ident() 
+              (rename, renameOffset)
+            }
           } else {
-            name
-          }))
+            (name, nameOffset)
+          }
+        
+        names += ImportSelector(name, nameOffset, name1, name1Offset)
         false
       }
     
