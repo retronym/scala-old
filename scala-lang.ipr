@@ -1169,6 +1169,8 @@
       <profile version="1.0" is_locked="false">
         <option name="myName" value="Project Default" />
         <option name="myLocal" value="false" />
+        <inspection_tool class="OneWayWebMethod" enabled="false" level="ERROR" enabled_by_default="false" />
+        <inspection_tool class="VoidMethodAnnotatedWithGET" enabled="false" level="WARNING" enabled_by_default="false" />
       </profile>
     </profiles>
     <list size="5">
@@ -1337,8 +1339,8 @@
   </component>
   <component name="ProjectDictionaryState">
     <dictionary name="odersky" />
+    <dictionary name="jason" />
   </component>
-  <component name="ProjectFileVersion" converted="true" />
   <component name="ProjectKey">
     <option name="state" value="https://lampsvn.epfl.ch/svn-repos/scala/scala/trunk/scala-lang.ipr" />
   </component>
@@ -1495,7 +1497,7 @@
   </component>
   <component name="WebServicesPlugin" addRequiredLibraries="true" />
   <component name="libraryTable">
-    <library name="Project ant library">
+    <library name="ant">
       <CLASSES>
         <root url="jar://$PROJECT_DIR$/lib/ant/ant-contrib.jar!/" />
         <root url="jar://$PROJECT_DIR$/lib/ant/vizant.jar!/" />

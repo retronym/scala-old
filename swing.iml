@@ -2,7 +2,11 @@
 <module relativePaths="true" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet type="Scala" name="Scala">
-      <configuration />
+      <configuration>
+        <option name="takeFromSettings" value="true" />
+        <option name="myScalaCompilerJarPath" value="$MODULE_DIR$/build/palo/lib/scala-compiler.jar" />
+        <option name="myScalaSdkJarPath" value="$MODULE_DIR$/build/palo/lib/scala-library.jar" />
+      </configuration>
     </facet>
   </component>
   <component name="NewModuleRootManager" inherit-compiler-output="true">
@@ -15,8 +19,7 @@
     <orderEntry type="module" module-name="actors" />
     <orderEntry type="module" module-name="compiler" />
     <orderEntry type="module" module-name="library" />
-    <orderEntry type="library" name="Project ant library" level="project" />
-    <orderEntry type="library" name="Project Scala SDK" level="project" />
+    <orderEntry type="library" name="ant" level="project" />
   </component>
 </module>
 
