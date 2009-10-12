@@ -31,18 +31,20 @@ trait ParallelMatching extends ast.TreeDSL
   import CODE._
   import Types._
   import Debug._
+  import Flags.{ TRANS_FLAG }
 
   /** Transition **/
-  def isRightIgnoring(t: Tree) = cond(unbind(t)) { case ArrayValue(_, xs) if !xs.isEmpty => isStar(xs.last) }
   def toPats(xs: List[Tree]): List[Pattern] = xs map Pattern.apply  
   
   /** The umbrella matrix class. **/  
-  class MatchMatrix(val context: MatrixContext, data: MatrixInit) extends MatchMatrixOptimizer with MatrixExhaustiveness {    
+  abstract class MatchMatrix(val context: MatrixContext) extends MatchMatrixOptimizer with MatrixExhaustiveness {
     import context._
+    
+    def data: MatrixContext#MatrixInit
 
-    val MatrixInit(roots, cases, failTree)  = data
-    val ExpandedMatrix(rows, targets)       = expand(roots, cases)
-    val expansion: Rep                      = make(roots, rows)
+    lazy val MatrixInit(roots, cases, failTree)  = data
+    lazy val ExpandedMatrix(rows, targets)       = expand(roots, cases)
+    lazy val expansion: Rep                      = make(roots, rows)
 
     val shortCuts   = new ListBuffer[Symbol]()
 
@@ -51,28 +53,26 @@ trait ParallelMatching extends ast.TreeDSL
       -shortCuts.length
     }
 
+    // XXX transitional.
+    final def requestBody(bx: Int, subst: Bindings): Tree =
+      requestBody(bx, PatternVarGroup.fromBindings(subst.get(), targets(bx).freeVars))
+     
     /** first time bx is requested, a LabelDef is returned. next time, a jump.
      *  the function takes care of binding
      */
-    final def requestBody(bx: Int, subst: Bindings): Tree = {
-      implicit val ctx = context
-      val target @ FinalState(tbx, body, freeVars) = targets(bx)
-      val substInfo = subst infoFor freeVars
-      import substInfo._
-      
-      // XXX when is this not true?
-      // assert(tbx == bx)
+    final def requestBody(bx: Int, pvgroup: PatternVarGroup): Tree = {
+      val target = targets(bx)
       
       // shortcut
-      if (bx < 0) Apply(ID(shortCuts(-bx-1)), Nil)
+      if (bx < 0) Apply(ID(shortCuts(-bx-1)), Nil)      
       // first time this bx is requested - might be bound elsewhere
-      else if (target.isNotReached) target.createLabelBody(bx, patternVars, patternValDefs)
+      else if (target.isNotReached) target.createLabelBody(bx, pvgroup)
       // call label "method" if possible
-      else target.getLabelBody(idents, patternValDefs)
+      else target.getLabelBody(pvgroup)
     }
 
     /** the injection here handles alternatives and unapply type tests */
-    final def make(tvars: List[Symbol], row1: List[Row]): Rep = {
+    final def make(tvars: PatternVarGroup, row1: List[Row]): Rep = {
       def classifyPat(opat: Pattern, j: Int): Pattern = opat simplify tvars(j)
 
       val rows = row1 flatMap (_ expandAlternatives classifyPat)
@@ -83,25 +83,31 @@ trait ParallelMatching extends ast.TreeDSL
     override def toString() = "MatchMatrix(%s) { %s }".format(matchResultType, indentAll(targets))
     
     /**
-     * Encapsulates a symbol being matched on.
+     * Encapsulates a symbol being matched on.  It is created from a
+     * PatternVar, which encapsulates the symbol's creation and assignment.
      * 
-     * sym match { ... }
-     *
-     * results in Scrutinee(sym).
-     *
-     * Note that we only ever match on Symbols, not Trees: a temporary variable
-     * is created for any expressions being matched on. 
+     * We never match on trees directly - a temporary variable is created
+     * (in a PatternVar) for any expression being matched on.
      */ 
-    case class Scrutinee(val sym: Symbol) {
+    class Scrutinee(val pv: PatternVar) {
       import definitions._
 
       // presenting a face of our symbol
-      def tpe       = sym.tpe
-      def pos       = sym.pos
-      def id        = ID(sym)   // attributed ident
+      def sym   = pv.sym      
+      def tpe   = sym.tpe
+      def pos   = sym.pos
+      def id    = ID(sym)   // attributed ident
       
       def accessors     = if (isCaseClass) sym.caseFieldAccessors else Nil
-      def accessorVars  = accessors map (a => newVarOfTpe((tpe memberType a).resultType))
+      def accessorTypes = accessors map (x => (tpe memberType x).resultType)
+      
+      lazy val accessorPatternVars  = PatternVarGroup(
+        for ((accessor, tpe) <- accessors zip accessorTypes) yield
+          createVar(tpe, _ => fn(id, accessor))
+      )
+      
+      private def extraValDefs = if (pv.rhs.isEmpty) Nil else List(pv.valDef)
+      def allValDefs = extraValDefs ::: accessorPatternVars.valDefs
 
       // tests
       def isDefined   = sym ne NoSymbol
@@ -109,19 +115,26 @@ trait ParallelMatching extends ast.TreeDSL
       def isCaseClass = tpe.typeSymbol hasFlag Flags.CASE
 
       // sequences
-      def seqType   = tpe.widen baseType SeqClass
-      def elemType  = tpe typeArgs 0
+      def seqType         = tpe.widen baseType SeqClass
+      def elemType        = tpe typeArgs 0
       
-      def newVarOfTpe(tpe: Type) = newVar(pos, tpe, flags)
-      def newVarOfSeqType = newVar(pos, seqType)
-      def newVarOfElemType = newVar(pos, elemType)
+      private def elemAt(i: Int)  = (id DOT (tpe member nme.apply))(LIT(i))
+      private def createElemVar(i: Int)   = createVar(elemType, _ => elemAt(i))
+      private def createSeqVar(drop: Int) = createVar(seqType, _ => id DROP drop)
+          
+      def createSequenceVars(count: Int): List[PatternVar] =
+        (0 to count).toList map (i => if (i < count) createElemVar(i) else createSeqVar(i))
 
       // for propagating "unchecked" to synthetic vars
-      def flags: List[Long] = List(Flags.TRANS_FLAG) filter (sym hasFlag _)
+      def isChecked = !(sym hasFlag TRANS_FLAG)
+      def flags: List[Long] = List(TRANS_FLAG) filter (sym hasFlag _)
+      
+      // this is probably where this actually belongs
+      def createVar(tpe: Type, f: Symbol => Tree) = context.createVar(tpe, f, isChecked)
 
       def castedTo(headType: Type) =
         if (tpe =:= headType) this
-        else new Scrutinee(newVar(pos, headType, flags))
+        else new Scrutinee(createVar(headType, lhs => id AS_ANY lhs.tpe))
       
       override def toString() = "(%s: %s)".format(id, tpe)
     }
@@ -160,14 +173,18 @@ trait ParallelMatching extends ast.TreeDSL
       def tail = ps.tail
       def size = ps.length
       
-      def headType = head.typeToMatch
+      def headType = head.necessaryType
       def isCaseHead = head.isCaseClass
       private val dummyCount = if (isCaseHead) headType.typeSymbol.caseFieldAccessors.length else 0
       def dummies = emptyPatterns(dummyCount)
+      // def dummies = head.dummies
 
       def apply(i: Int): Pattern = ps(i)
       def pzip() = ps.zipWithIndex
-      def pzip[T](others: List[T]) = ps zip others
+      def pzip[T](others: List[T]) = {
+        assert(ps.size == others.size, "Internal error: ps = %s, others = %s".format(ps, others))
+        ps zip others
+      }
 
       // Any unapply - returns Some(true) if a type test is needed before the unapply can
       // be called (e.g. def unapply(x: Foo) = { ... } but our scrutinee is type Any.)
@@ -209,54 +226,55 @@ trait ParallelMatching extends ast.TreeDSL
     val NoGuard = Guard(EmptyTree)
 
     /***** Rule Applications *****/
-    
-    trait RuleApplicationFormal extends RuleApplication {
+
+    sealed abstract class RuleApplication {
+      // def isFinal = false
+      // def body = tree
+      // def freeVars = (scrut.pv :: rest.tvars).syms
+      
+      def pmatch: PatternMatch
+      def rest: Rep
       def cond: Tree
       def success: Tree
       def failure: Tree
       
-      def codegen: Tree = IF (cond) THEN (success) ELSE (failure)
-    }    
-
-    sealed abstract class RuleApplication {
-      def pmatch: PatternMatch
-      def rest: Rep
-      
       lazy val PatternMatch(scrut, patterns) = pmatch
       lazy val head = pmatch.head
+      def codegen: Tree = IF (cond) THEN (success) ELSE (failure)
       
-      def mkFail(xs: List[Row]): Tree = xs match {
-        case Nil  => failTree
-        case _    => make(scrut.sym :: rest.tvars, xs).toTree
+      def mkFail(xs: List[Row]): Tree =
+        if (xs.isEmpty) failTree
+        else remake(xs).toTree
+      
+      def remake(
+        rows: List[Row],
+        pvgroup: PatternVarGroup = emptyPatternVarGroup,
+        includeScrut: Boolean = true): Rep =
+      {
+        val scrutpvs = if (includeScrut) List(scrut.pv) else Nil
+        make(pvgroup.pvs ::: scrutpvs ::: rest.tvars, rows)  
       }
 
       /** translate outcome of the rule application into code (possible involving recursive application of rewriting) */
       def tree(): Tree
       
-      override def toString = 
+      override def toString =       
         "Rule/%s (%s =^= %s)".format(getClass.getSimpleName, scrut, head)
-    }
-
-    case class ErrorRule() extends RuleApplication {
-      def pmatch: PatternMatch = impossible
-      def rest: Rep = impossible
-      final def tree() = failTree
     }
 
     /** {case ... if guard => bx} else {guardedRest} */
     /** VariableRule: The top-most rows has only variable (non-constructor) patterns. */
-    case class VariableRule(subst: Bindings, guard: Guard, guardedRest: Rep, bx: Int) extends RuleApplicationFormal {
+    case class VariableRule(subst: Bindings, guard: Guard, guardedRest: Rep, bx: Int) extends RuleApplication {
       def pmatch: PatternMatch = impossible
       def rest: Rep = guardedRest
       
       lazy val cond     = if (guard.isEmpty) TRUE else guard.duplicate.tree
       lazy val success  = requestBody(bx, subst)
       lazy val failure  = guardedRest.toTree
-
-      final def tree(): Tree = {
-        implicit val ctx = context
-        squeezedBlock(subst.infoForAll.patternValDefs, codegen)
-      }
+      
+      lazy val pvgroup  = PatternVarGroup.fromBindings(subst.get())
+      
+      final def tree(): Tree = squeezedBlock(pvgroup.valDefs, codegen)
     }
 
     /** Mixture rule for all literal ints (and chars) i.e. hopefully a switch
@@ -267,7 +285,7 @@ trait ParallelMatching extends ast.TreeDSL
       val literals = pmatch.ps
       val defaultPattern = pmatch.defaultPattern
       
-      private lazy val target: Tree =
+      private lazy val casted: Tree =
         if (!scrut.tpe.isInt) scrut.id DOT nme.toInt else scrut.id      
               
       // creates a row transformer for injecting the default case bindings at a given index
@@ -297,7 +315,7 @@ trait ParallelMatching extends ast.TreeDSL
       // varMap is a list from each literal to a list of the defined vars.
       lazy val (literalMap, varMap) = {
         val tags    = literals map (_.intValue)
-        val varMap  = tags zip (literals map (_.definedVars))
+        val varMap  = tags zip (literals map (_.deepBoundVariables))
         val litMap  =
           tags.zipWithIndex.reverse.foldLeft(IntMap.empty[List[Int]]) {
             // we reverse before the fold so the list can be built with :: 
@@ -310,47 +328,49 @@ trait ParallelMatching extends ast.TreeDSL
       lazy val cases =
         for ((tag, indices) <- literalMap.toList) yield {
           val newRows = indices map (i => addDefaultVars(i)(rest rows i))
-          val r       = make(rest.tvars, newRows ::: defaultRows)
-          val r2      = make(r.tvars, r.rows map (x => x rebind bindVars(tag, x.subst)))
+          val r   = remake(newRows ::: defaultRows, includeScrut = false)
+          val r2  = make(r.tvars, r.rows map (x => x rebind bindVars(tag, x.subst)))
 
           CASE(Literal(tag)) ==> r2.toTree
         }
       
-      lazy val defaultTree  = make(rest.tvars, defaultRows).toTree
+      lazy val defaultTree  = remake(defaultRows, includeScrut = false).toTree
       def casesWithDefault  = cases ::: List(CASE(WILD(IntClass.tpe)) ==> defaultTree)
       
-      // only one case becomes if/else, otherwise match
-      def tree() = cases match {
-        case List(CaseDef(lit, _, body))  => IF (scrut.id MEMBER_== lit) THEN body ELSE defaultTree
-        case _                            => target MATCH (casesWithDefault: _*)
+      // cond/success/failure only used if there is exactly one case.
+      lazy val (cond, success) = cases match {
+        case List(CaseDef(lit, _, body))  => (scrut.id MEMBER_== lit, body)
       }
+      lazy val failure = defaultTree
+      
+      // only one case becomes if/else, otherwise match
+      def tree() = 
+        if (cases.size == 1) codegen
+        else casted MATCH (casesWithDefault: _*)      
     }
 
     /** mixture rule for unapply pattern
      */
-    class MixUnapply(val pmatch: PatternMatch, val rest: Rep, typeTest: Boolean) extends RuleApplicationFormal {
+    class MixUnapply(val pmatch: PatternMatch, val rest: Rep, typeTest: Boolean) extends RuleApplication {
       val uapattern = head match { case x: UnapplyPattern => x ; case _ => abort("XXX") }
       val ua @ UnApply(app, args) = head.tree
 
-      private lazy val zipped      = pmatch pzip rest.rows
-
       // Note: trailingArgs is not necessarily Nil, because unapply can take implicit parameters.      
       val Apply(fxn, _ :: trailingArgs) = app
-      def unapplyReturnType = if (args.isEmpty) BooleanClass.tpe else app.tpe typeArgs 0
-
-      lazy val unapplyVar     = newVar(ua.pos, app.tpe, scrut.flags)
-      lazy val unapplyValDef  =
-        typedValDef(unapplyVar, Apply(fxn, scrut.id :: trailingArgs) setType unapplyVar.tpe)
-
-      def mkGet(s: Symbol) = typedValDef(s, fn(ID(unapplyVar), nme.get))
-      def mkVar(tpe: Type) = newVar(ua.pos, tpe, scrut.flags)
+      private def reapply = Apply(fxn, scrut.id :: trailingArgs)
       
+      private lazy val zipped      = pmatch pzip rest.rows
+      
+      lazy val unapplyResult: PatternVar =
+        scrut.createVar(app.tpe, lhs => reapply setType lhs.tpe)
+
       // XXX in transition.
       object sameUnapplyCall {
         private def sameFunction(fn1: Tree) = fxn.symbol == fn1.symbol && (fxn equalsStructure fn1)
 
         def unapply(p: Pattern) = condOpt(p) {
-          case Pattern(UnApply(Apply(fn1, _), args), _) if sameFunction(fn1)  => args
+          case Pattern(UnApply(Apply(fn1, _), args), _) if sameFunction(fn1)  =>
+            tracing("sameUnapply", args)
         }
       }      
       object SameUnapply {
@@ -361,57 +381,55 @@ trait ParallelMatching extends ast.TreeDSL
       }
       def isSameUnapply(p: Pattern) = SameUnapply.unapply(p).isDefined
       
-      // Second argument is number of dummies to prepend in the default case
-      def mkNewRows(sameFilter: (List[Tree]) => List[Tree], dum: Int) =
-        for ((pat, r) <- zipped) yield pat match {
-          case sameUnapplyCall(args)  => r.insert2(toPats(sameFilter(args)) ::: List(NoPattern), pat.boundVariables, scrut.sym)
-          case _                      => r insert (emptyPatterns(dum) ::: List(pat))
-        }
-      
-      lazy val cond: Tree = {
-        val s = unapplyValDef.symbol
-        if (s.tpe.isBoolean) ID(s)
-        else s IS_DEFINED
-      }
+      lazy val cond: Tree =
+        if (unapplyResult.tpe.isBoolean) ID(unapplyResult.valsym)
+        else unapplyResult.valsym IS_DEFINED
 
       lazy val failure = 
         mkFail(zipped.tail filterNot (x => isSameUnapply(x._1)) map { case (pat, r) => r insert pat })
       
-      lazy val success = { 
-        val (vdefs, ntemps, nrows) =
-          args.length match {
-            case 0  =>
-              (Nil, Nil, mkNewRows((xs) => Nil, 0))
+      private def doSuccess: (List[PatternVar], List[PatternVar], List[Row]) = {
+        // pattern variable for the unapply result of Some(x).get
+        lazy val pv = scrut.createVar(
+          app.tpe typeArgs 0,
+          _ => fn(ID(unapplyResult.lhs), nme.get)
+        )
+        def tuple = pv.lhs
 
-            case 1 =>
-              val lhs = mkVar(app.tpe typeArgs 0)
-              val vdef = mkGet(lhs)
-              (List(vdef), List(lhs), mkNewRows(xs => List(xs.head), 1))
-
-            case _ =>
-              val uresGet   = mkVar(app.tpe typeArgs 0)
-              val vdefHead  = mkGet(uresGet)
-              val ts        = getProductArgs(uresGet.tpe).get
-              val nrows     = mkNewRows(identity, ts.size)
-
-              val (vdefs: List[Tree], vsyms: List[Symbol]) = List.unzip(
-                for ((vtpe, i) <- ts.zipWithIndex) yield {
-                  val vchild  = mkVar(vtpe)
-                  val accSym  = productProj(uresGet, i+1)
-                  val rhs     = fn(ID(uresGet), accSym)
-
-                  (typedValDef(vchild, rhs), vchild)
-                })
-
-              (vdefHead :: vdefs, vsyms, nrows)
+        // at this point it's Some[T1,T2...]
+        lazy val tpes  = getProductArgs(tuple.tpe).get
+      
+        // one pattern variable per tuple element
+        lazy val tuplePVs =
+          for ((tpe, i) <- tpes.zipWithIndex) yield
+            scrut.createVar(tpe, _ => fn(ID(tuple), productProj(tuple, i + 1)))
+            
+        // the filter prevents infinite unapply recursion
+        def mkNewRows(sameFilter: (List[Tree]) => List[Tree]) = {
+          val dum = if (args.length <= 1) args.length else tpes.size
+          for ((pat, r) <- zipped) yield pat match {
+            case sameUnapplyCall(xs)  => r.insert2(toPats(sameFilter(xs)) ::: List(NoPattern), pat.boundVariables, scrut.sym)
+            case _                    => r insert (emptyPatterns(dum) ::: List(pat))
           }
+        }
+
+        // 0 is Boolean, 1 is Option[T], 2+ is Option[(T1,T2,...)]
+        args.length match {
+          case 0  => (Nil, Nil, mkNewRows((xs) => Nil))
+          case 1  => (List(pv), List(pv), mkNewRows(xs => List(xs.head)))
+          case _  => (pv :: tuplePVs, tuplePVs, mkNewRows(identity))
+        }
+      }
+
+      lazy val success = {
+        val (squeezePVs, pvs, rows) = doSuccess
+        val srep = remake(rows, pvs).toTree
         
-        val srep = make(ntemps ::: scrut.sym :: rest.tvars, nrows).toTree
-        squeezedBlock(vdefs, srep)
+        squeezedBlockPVs(squeezePVs, srep)
       }
       
       final def tree() =
-        squeezedBlock(List(handleOuter(unapplyValDef)), codegen)
+        squeezedBlock(List(handleOuter(unapplyResult.valDef)), codegen)
     }
 
     /** handle sequence pattern and ArrayValue (but not star patterns)
@@ -420,14 +438,7 @@ trait ParallelMatching extends ast.TreeDSL
       // Called 'pivot' since it's the head of the column under consideration in the mixture rule.
       val pivot @ SequencePattern(av @ ArrayValue(_, _)) = head      
       private def pivotLen = pivot.nonStarLength
-      
-      /** array elements except for star (if present) */
-      protected def nonStarElems(x: ArrayValue) =
-        if (isRightIgnoring(x)) x.elems.init else x.elems
               
-      final def removeStar(xs: List[Pattern]): List[Pattern] = 
-        xs.init ::: List(Pattern(makeBind(xs.last.boundVariables, WILD(scrut.seqType))))
-        
       def mustCheck(first: Pattern, next: Pattern): Boolean = {
         if (first.tree eq next.tree)
           return false
@@ -435,33 +446,39 @@ trait ParallelMatching extends ast.TreeDSL
         !(first completelyCovers next)
       }
       
-      def getSubPatterns(x: Pattern): Option[List[Pattern]] = condOpt(x.tree) {
-        case av @ ArrayValue(_, xs) if nonStarElems(av).length == pivotLen =>
-          val (star1, star2) = (pivot.hasStar, isRightIgnoring(av))
-          
-          (star1, star2) match {
-            case (true, true)   => removeStar(toPats(xs)) ::: List(NoPattern)
+      def getSubPatterns(x: Pattern): Option[List[Pattern]] = {
+        // def defaults = Some(emptyPatterns(pivot.elemPatterns.length + 1))
+        def defaults = Some(pivot.dummies)
+        val av @ ArrayValue(_, xs) = x.tree match {
+          case x: ArrayValue      => x
+          case EmptyTree | WILD() => return defaults
+          case _                  => return None
+        }
+        
+        val sp = x.asInstanceOf[SequencePattern]
+        val (star1, star2) = (pivot.hasStar, sp.hasStar)
+        
+        if (sp.nonStarLength == pivotLen) {
+          Some((star1, star2) match {
+            case (true, true)   => (sp rebindStar scrut.seqType) ::: List(NoPattern)
             case (true, false)  => toPats(xs ::: List(gen.mkNil, EmptyTree))
-            case (false, true)  => removeStar(toPats(xs))
+            case (false, true)  => (sp rebindStar scrut.seqType)
             case (false, false) => toPats(xs) ::: List(NoPattern)
-          }
-        case av @ ArrayValue(_, xs) if pivot.hasStar && isRightIgnoring(av) && xs.length-1 < pivotLen => 
-          emptyPatterns(pivotLen + 1) ::: List(x)
-
-        case EmptyTree | WILD() =>
-          emptyPatterns(pivot.elemPatterns.length + 1)
+          })
+        }
+        else if (pivot.hasStar && sp.hasStar && xs.length-1 < pivotLen)
+          Some(emptyPatterns(pivotLen + 1) ::: List(x))
+        else
+          defaults    // XXX
       }
-
-      final def tree(): Tree = {
+      
+      lazy val cond = (pivot precondition pmatch).get
+      
+      lazy val (success, failure) = {
         assert(scrut.tpe <:< head.tpe, "fatal: %s is not <:< %s".format(scrut, head.tpe))
         
-        val vs                  = pivot.nonStarPatterns map (x => newVar(x.tree.pos, scrut.elemType))
-        lazy val tail           = scrut.newVarOfSeqType
-        lazy val lastBinding    = typedValDef(tail, scrut.id DROP vs.size)
-        def elemAt(i: Int)      = (scrut.id DOT (scrut.tpe member nme.apply))(LIT(i))
-
-        val bindings =
-          (vs.zipWithIndex map tupled((v, i) => typedValDef(v, elemAt(i)))) ::: List(lastBinding)
+        // one pattern var per sequence element up to elemCount, and one more for the rest of the sequence
+        val pvs = scrut createSequenceVars pivot.nonStarPatterns.size
 
         val (nrows, frows): (List[Option[Row]], List[Option[Row]]) = List.unzip(
           for ((c, rows) <- pmatch pzip rest.rows) yield getSubPatterns(c) match {
@@ -469,23 +486,22 @@ trait ParallelMatching extends ast.TreeDSL
             case None     => (None, Some(rows insert c))
           }
         )
-
-        val symList = if (pivot.hasStar) List(scrut.sym) else Nil
-        val cond = (pivot precondition pmatch).get
-        val succ = make(List(vs, List(tail), symList, rest.tvars).flatten, nrows.flatten).toTree
-        val fail = make(scrut.sym :: rest.tvars, frows.flatten).toTree
         
-        IF (cond) THEN squeezedBlock(bindings, succ) ELSE fail
+        val succ = remake(nrows.flatten, pvs, includeScrut = pivot.hasStar)
+        
+        (
+          squeezedBlockPVs(pvs, succ.toTree),
+          remake(frows.flatten).toTree
+        )
       }
+      
+      final def tree(): Tree = codegen
     }
 
     // @todo: equals test for same constant
-    class MixEquals(val pmatch: PatternMatch, val rest: Rep) extends RuleApplicationFormal {
-      private def mkNewRep(rows: List[Row]) =
-        make(scrut.sym :: rest.tvars, rows).toTree
-        
+    class MixEquals(val pmatch: PatternMatch, val rest: Rep) extends RuleApplication {        
       private lazy val labelBody =
-        mkNewRep(List.map2(rest.rows.tail, pmatch.tail)(_ insert _))
+        remake(List.map2(rest.rows.tail, pmatch.tail)(_ insert _)).toTree
         
       private lazy val rhs =
         decodedEqualsType(head.tpe) match {
@@ -499,11 +515,10 @@ trait ParallelMatching extends ast.TreeDSL
       lazy val cond =
         handleOuter(scrut.id MEMBER_== rhs)
 
-      lazy val success =
-        mkNewRep(List(
-          rest.rows.head.insert2(List(NoPattern), head.boundVariables, scrut.sym),
-          Row(emptyPatterns(1 + rest.tvars.length), NoBinding, NoGuard, shortCut(label))
-        ))
+      lazy val success = remake(List(
+        rest.rows.head.insert2(List(NoPattern), head.boundVariables, scrut.sym),
+        Row(emptyPatterns(1 + rest.tvars.size), NoBinding, NoGuard, shortCut(label))
+      )).toTree
  
       lazy val failure = LabelDef(label, Nil, labelBody)
 
@@ -511,109 +526,49 @@ trait ParallelMatching extends ast.TreeDSL
       override def toString() = "MixEquals(%s == %s)".format(scrut, head)
     }
 
-    /** mixture rule for type tests
-    **/
+    /** Mixture rule for type tests.
+     *  moreSpecific: more specific patterns
+     *      subsumed: more general patterns (subsuming current), rows index and subpatterns
+     *     remaining: remaining, rows index and pattern
+     */
     class MixTypes(val pmatch: PatternMatch, val rest: Rep) extends RuleApplication {
-      // see bug1434.scala for an illustration of why "x <:< y" is insufficient.
-      // this code is definitely inadequate at best.  Inherited comment:
-      //
-      //   an approximation of _tp1 <:< tp2 that ignores _ types. this code is wrong,
-      //   ideally there is a better way to do it, and ideally defined in Types.scala          
-      private def matches(arg1: Type, arg2: Type) = {
-        val List(t1, t2) = List(arg1, arg2) map decodedEqualsType
-        def eqSymbols = t1.typeSymbol eq t2.typeSymbol
-        //  note: writing this as "t1.baseTypeSeq exists (_ =:= t2)" does not lead to 1434 passing.
-        def isSubtype = t1.baseTypeSeq exists (_.typeSymbol eq t2.typeSymbol)
-        
-        (t1 <:< t2) || ((t1, t2) match {
-          case (_: TypeRef, _: TypeRef) => !t1.isArray && (t1.prefix =:= t2.prefix) && (eqSymbols || isSubtype)
-          case _ => false
-        })
-      }
+      case class Yes(bx: Int, moreSpecific: Pattern, subsumed: List[Pattern])
+      case class No(bx: Int, remaining: Pattern)
       
-      // moreSpecific: more specific patterns
-      //     subsumed: more general patterns (subsuming current), rows index and subpatterns
-      //    remaining: remaining, rows index and pattern
-      def join[T](xs: List[Option[T]]): List[T] = xs.flatMap(x => x)
-      val (moreSpecific, subsumed, remaining) : (List[Pattern], List[(Int, List[Pattern])], List[(Int, Pattern)]) = unzip3(
+      val (yeses, noes) : (List[Yes], List[No]) = List.unzip(
         for ((pattern, j) <- pmatch.pzip()) yield {
           // scrutinee, head of pattern group
-          val (s, p) = (pattern.tpe, pmatch.headType)
+          val (s, p) = (pattern.tpe, head.necessaryType)
+          
+          def isEquivalent  = head.necessaryType =:= pattern.tpe
+          def isObjectTest  = pattern.isObject && (p =:= pattern.necessaryType)          
           
           def sMatchesP = matches(s, p)
           def pMatchesS = matches(p, s)
-          
-          def alts[T](yes: T, no: T): T = if (p =:= s) yes else no
-          def isObjectTest              = pattern.isObject && (p =:= pattern.typeToMatch)
 
-          lazy val dummy          = (j, pmatch.dummies)
-          lazy val pass           = (j, pattern)
-          lazy val subs           = (j, pattern subpatterns pmatch)
-
-          // each pattern will yield a triple of options corresponding to the three lists,
-          // which will be flattened down to the values
-          implicit def mkOpt[T](x: T): Option[T] = Some(x)    // limits noise from Some(value)
+          def ifEquiv(yes: Pattern): Pattern = if (isEquivalent) yes else pattern
           
-          // Note - at the moment these comments are mostly trivial or nonsensical, but
-          // they persist from a much earlier time and I still try to read the tea leaves
-          //
-          // (1) special case for constant null
-          // (2) matching an object
-          // (3) <:< is never <equals>
-          // (4) never =:= for <equals>
+          def passl(p: Pattern = NoPattern, ps: List[Pattern] = pmatch.dummies) = Some(Yes(j, p, ps))
+          def passr()                                                           = Some( No(j, pattern))
+          
+          def typed(pp: Tree) = passl(ifEquiv(Pattern(pp)))
+          def subs()          = passl(ifEquiv(NoPattern), pattern subpatterns pmatch)
            
           (pattern match {
-            case Pattern(LIT(null), _) if !(p =:= s)                            => (None, None, pass)                         // (1)
-            case x if isObjectTest                                              => (NoPattern, dummy, None)                   // (2)
-            case Pattern(Typed(pp @ Pattern(_: UnApply, _), _), _) if sMatchesP => (Pattern(pp), dummy, None)                 // (3)
-            case Pattern(Typed(pp, _), _) if sMatchesP                          => (alts(Pattern(pp), pattern), dummy, None)  // (4)
-            case Pattern(_: UnApply, _)                                         => (NoPattern, dummy, pass)
-            case x if !x.isDefault && sMatchesP                                 => (alts(NoPattern, pattern), subs, None)
-            case x if  x.isDefault || pMatchesS                                 => (NoPattern, dummy, pass)
-            case _                                                              => (None, None, pass)
-
-            // The below (back when the surrounding code looked much different) fixed bugs 425 and 816
-            // with only the small downside of causing 60 other tests to fail.
-            // case _ =>
-            //   if (erased_xIsaY || xIsaY && !isDef)  (alts(EmptyTree, pat), subs, None) // never =:= for <equals>
-            //   else if (isDef)                       (EmptyTree,           dummy, pass)
-            //   else                                  (None,                 None, pass)
-              
-          }) : (Option[Pattern], Option[(Int, List[Pattern])], Option[(Int, Pattern)])
+            case Pattern(LIT(null), _) if !(p =:= s)        => (None, passr)      // (1)
+            case x if isObjectTest                          => (passl(), None)    // (2)
+            case Pattern(Typed(pp, _), _)     if sMatchesP  => (typed(pp), None)  // (4)
+            case Pattern(_: UnApply, _)                     => (passl(), passr)
+            case x if !x.isDefault && sMatchesP             => (subs(), None)
+            case x if  x.isDefault || pMatchesS             => (passl(), passr)
+            case _                                          => (None, passr)              
+          }) : (Option[Yes], Option[No])
         }
-      ) match { case (x,y,z) => (join(x), join(y), join(z)) }
-        
-      override def toString = {
-        val msgs = List(
-          "moreSpecific: " + pp(moreSpecific),
-          "    subsumed: " + pp(subsumed),
-          "   remaining: " + pp(remaining)
-        )
-        
-        super.toString() + "\n" + indentAll(msgs)
-      }
-
-      /** returns casted symbol, success matrix and optionally fail matrix for type test on the top of this column */
-      final def getTransition() = {
-        val casted = scrut castedTo pmatch.headType
-        
-        val isAnyMoreSpecific = moreSpecific exists (x => !x.isEmpty)
-        
-        def mkZipped    = moreSpecific zip subsumed map { case (mspat, (j, pmatch)) => (j, mspat :: pmatch) }
-
-        val (subtests, subtestVars) =
-          if (isAnyMoreSpecific)  (mkZipped, List(casted.sym))
-          else                    (subsumed, Nil)
-                  
-        val newRows =
-          for ((j, ps) <- subtests) yield 
-            (rest rows j).insert2(ps, pmatch(j).boundVariables, casted.sym)
-
-        val success = make(subtestVars ::: casted.accessorVars ::: rest.tvars, newRows)
-        val failure = mkFail(remaining map tupled((p1, p2) => rest rows p1 insert p2))
-          
-        (casted, success, failure)
-      }
+      ) match { case (x,y) => (x.flatten, y.flatten) }
+      
+      val moreSpecific = yeses map (_.moreSpecific)
+      val subsumed = yeses map (x => (x.bx, x.subsumed))
+      val remaining = noes map (x => (x.bx, x.remaining))
       
       // temporary checks so we're less crashy while we determine what to implement.
       def checkErroneous(scrut: Scrutinee): Type = {
@@ -624,36 +579,46 @@ trait ParallelMatching extends ast.TreeDSL
           case x => x
         }
       }
-
-      final def tree(): Tree = {
-        val (casted, srep, fail) = this.getTransition
-        val castedTpe = checkErroneous(casted)
-        val cond = condition(castedTpe, scrut)
-        val succ = srep.toTree
-
-        // dig out case field accessors that were buried in (***)
-        val cfa         = if (pmatch.isCaseHead) casted.accessors else Nil
-        val caseTemps   = srep.tvars match { case x :: xs if x == casted.sym => xs ; case x => x }
-        def castedScrut = typedValDef(casted.sym, scrut.id AS_ANY castedTpe)
-        def needCast    = if (casted.sym ne scrut.sym) List(castedScrut) else Nil 
-        
-        val vdefs       = needCast ::: (
-          for ((tmp, accessor) <- caseTemps zip cfa) yield
-            typedValDef(tmp, fn(casted.id, accessor))
-        )
-
-        IF (cond) THEN squeezedBlock(vdefs, succ) ELSE fail
+      
+      private def mkZipped =
+        for (Yes(j, moreSpecific, subsumed) <- yeses) yield
+          j -> (moreSpecific :: subsumed)
+      
+      lazy val casted = scrut castedTo pmatch.headType
+      lazy val cond   = condition(checkErroneous(casted), scrut)
+      
+      private def isAnyMoreSpecific = yeses exists (x => !x.moreSpecific.isEmpty)
+      lazy val (subtests, subtestVars) =
+        if (isAnyMoreSpecific)  (mkZipped, List(casted.pv))
+        else                    (subsumed, Nil)
+      
+      lazy val newRows =
+        for ((j, ps) <- subtests) yield 
+          (rest rows j).insert2(ps, pmatch(j).boundVariables, casted.sym)
+      
+      lazy val success = {
+        val srep = remake(newRows, subtestVars ::: casted.accessorPatternVars, includeScrut = false)
+        squeezedBlock(casted.allValDefs, srep.toTree)
       }
+      
+      lazy val failure =
+        mkFail(remaining map tupled((p1, p2) => rest rows p1 insert p2))
+
+      final def tree(): Tree = codegen
     }
 
     /*** States, Rows, Etc. ***/
 
     case class Row(pats: List[Pattern], subst: Bindings, guard: Guard, bx: Int) {
+      private def substpp = if (subst.get().isEmpty) "" else "(free = %s)".format(pp(subst.get()))
       if (pats exists (p => !p.isDefault))
-        traceCategory("Row", "%s", pp(pats))
-        
-      /** Drops the 'i'th pattern */      
-      def drop(i: Int) = copy(pats = dropIndex(pats, i))
+        traceCategory("Row", "%s%s", pats, substpp)
+      
+      /** Extracts the 'i'th pattern. */
+      def extractColumn(i: Int) = {
+        val (x, xs) = extractIndex(pats, i)
+        (x, copy(pats = xs))
+      }
       
       /** Replaces the 'i'th pattern with the argument. */
       def replaceAt(i: Int, p: Pattern) = {
@@ -665,16 +630,17 @@ trait ParallelMatching extends ast.TreeDSL
       def insert(hs: List[Pattern])       = copy(pats = hs ::: pats)  // prepends supplied pattern
       def rebind(b: Bindings)             = copy(subst = b)           // substitutes for bindings
         
-      def insert2(hs: List[Pattern], vs: Iterable[Symbol], tvar: Symbol) =             // prepends and prepends
-        copy(pats = hs ::: pats, subst = subst.add(vs, tvar))
+      def insert2(hs: List[Pattern], vs: Iterable[Symbol], tvar: Symbol) =
+        tracing("insert2", copy(pats = hs ::: pats, subst = subst.add(vs, tvar)))
 
       // returns this rows with alternatives expanded
       def expandAlternatives(classifyPat: (Pattern, Int) => Pattern): List[Row] = {
+        def isNotAlternative(p: Pattern) = !cond(p.tree) { case _: Alternative => true }
+        
         // classify all the top level patterns - alternatives come back unaltered
         val newPats: List[Pattern] = pats.zipWithIndex map tupled(classifyPat)        
         // see if any alternatives were in there
-        val (ps, others) = newPats span (x => !x.isAlternative)
-        
+        val (ps, others) = newPats span isNotAlternative
         // make a new row for each alternative, with it spliced into the original position
         if (others.isEmpty) List(copy(pats = ps))
         else extractBindings(others.head) map (x => replaceAt(ps.size, x))
@@ -684,17 +650,22 @@ trait ParallelMatching extends ast.TreeDSL
     
     object ExpandedMatrix {
       def unapply(x: ExpandedMatrix) = Some((x.rows, x.targets))
-      def apply(rows: List[Row], targets: List[FinalState]) = new ExpandedMatrix(rows, targets)
+      def apply(rowz: List[(Row, FinalState)]) =
+        new ExpandedMatrix(rowz map (_._1), rowz map (_._2))
     }
     
     class ExpandedMatrix(val rows: List[Row], val targets: List[FinalState]) {
       require(rows.size == targets.size)
       
-      override def toString() =
-        "ExpandedMatrix(%d)".format(rows.size) + pp(rows zip targets, true)
+      override def toString() = {
+        def rprint(r: Row) = "Row %d: %d pats, %d bound".format(r.bx, r.pats.size, r.subst.get().size)
+        def tprint(t: FinalState) = "%s (free = %s)".format(t.body, pp(t.freeVars))
+        val xs = rows zip targets map { case (r,t) => rprint(r) -> tprint(t) }
+        val ppstr = pp(xs, newlines = true)
+                    
+        "ExpandedMatrix(%d rows)".format(rows.size) + ppstr
+      }
     }
-    
-    case class Branch[T](action: T, succ: Rep, fail: Option[Rep])
     
     abstract class State {
       def body: Tree
@@ -730,7 +701,10 @@ trait ParallelMatching extends ast.TreeDSL
         abort(msg.format(name, pp(labelParamTypes), pp(idents), pp(vdefs)))
       }
       
-      def createLabelBody(index: Int, args: List[Symbol], vdefs: List[Tree]) = {
+      def createLabelBody(index: Int, pvgroup: PatternVarGroup) = {
+        def args = pvgroup.syms
+        def vdefs = pvgroup.valDefs
+        
         val name = "body%" + index
         require(_labelSym == null)
         referenceCount += 1
@@ -753,7 +727,9 @@ trait ParallelMatching extends ast.TreeDSL
         ifLabellable(vdefs, squeezedBlock(vdefs, label))
       }
       
-      def getLabelBody(idents: List[Tree], vdefs: List[Tree]): Tree = {        
+      def getLabelBody(pvgroup: PatternVarGroup): Tree = {
+        def idents = pvgroup map (_.rhs)
+        def vdefs = pvgroup.valDefs
         referenceCount += 1
         // if (idents.size != labelParamTypes.size)
         //   consistencyFailure(idents, vdefs)
@@ -768,7 +744,7 @@ trait ParallelMatching extends ast.TreeDSL
       override def toString() = pp("Final%d%s".format(bx, pp(freeVars)) -> body)
     }
 
-    case class Rep(val tvars: List[Symbol], val rows: List[Row]) {      
+    case class Rep(val tvars: PatternVarGroup, val rows: List[Row]) {      
       lazy val Row(pats, subst, guard, index) = rows.head
       lazy val guardedRest        = if (guard.isEmpty) NoRep else make(tvars, rows.tail)
       lazy val (defaults, others) = pats span (_.isDefault)
@@ -778,27 +754,29 @@ trait ParallelMatching extends ast.TreeDSL
       
       /** Cut out the column containing the non-default pattern. */
       class Cut(index: Int) {
-        /** The first two separate out the 'i'th pattern in each row from the remainder. */
-        private val _column = rows map (_ pats index)
-        private val _rows   = rows map (_ drop index)
+        /** The first two separate out the 'i'th pattern in each row from the remainder. */        
+        private val (_column, _rows) =
+          List.unzip(rows map (_ extractColumn index))
         
         /** Now the 'i'th tvar is separated out and used as a new Scrutinee. */
-        private val _sym    = tvars(index)
-        private val _tvars  = dropIndex(tvars, index)
-        private val _scrut  = new Scrutinee(_sym)
+        private val (_pv, _tvars) =
+          tvars extractIndex index
         
-        /** The first non-default pattern (others.head) takes the place of _column's head. */
-        def mix = MixtureRule(_scrut, others.head :: _column.tail, make(_tvars, _rows))
+        /** The non-default pattern (others.head) replaces the column head. */
+        private val (_ncol, _nrep) =
+          (others.head :: _column.tail, make(_tvars, _rows))
+        
+        def mix = MixtureRule(new Scrutinee(specialVar(_pv.sym, _pv.checked)), _ncol, _nrep)
       }
       
       /** Converts this to a tree - recursively acquires subreps. */
-      final def toTree(): Tree = typer typed this.applyRule.tree()
+      final def toTree(): Tree = typer typed this.applyRule()
       
       /** The VariableRule. */
-      private def variable() = {
-        val binding = (defaults map (_.boundVariables) zip tvars) .
-          foldLeft(subst)((b, pair) => b.add(pair._1, pair._2))
-          
+      private def variable() = {        
+        val binding = (defaults map (_.boundVariables) zip tvars.pvs) .
+          foldLeft(subst)((b, pair) => b.add(pair._1, pair._2.lhs))
+        
         VariableRule(binding, guard, guardedRest, index)
       }
       
@@ -809,12 +787,12 @@ trait ParallelMatching extends ast.TreeDSL
         *
         *   VariableRule - if all patterns are default patterns
         *    MixtureRule - if one or more patterns are not default patterns
-        *      ErrorRule - if there are no rows remaining
+        *          Error - no rows remaining
         */
-      final def applyRule(): RuleApplication =
-        if (rows.isEmpty) ErrorRule()
-        else if (others.isEmpty) variable()
-        else mixture()
+      final def applyRule(): Tree =
+        if (rows.isEmpty) failTree
+        else if (others.isEmpty) variable.tree()
+        else mixture.tree()
       
       override def toString() =
         if (tvars.size == 0) "Rep(%d) = %s".format(rows.size, pp(rows))
@@ -823,8 +801,8 @@ trait ParallelMatching extends ast.TreeDSL
     
     val NoRep = Rep(Nil, Nil)
     /** Expands the patterns recursively. */
-    final def expand(roots: List[Symbol], cases: List[CaseDef]): ExpandedMatrix = {
-      val (rows, finals) = List.unzip(
+    final def expand(roots: List[PatternVar], cases: List[CaseDef]) =
+      tracing("Expanded", ExpandedMatrix(
         for ((CaseDef(pat, guard, body), index) <- cases.zipWithIndex) yield {
           def mkRow(ps: List[Tree]) = Row(toPats(ps), NoBinding, Guard(guard), index)
           
@@ -835,12 +813,9 @@ trait ParallelMatching extends ast.TreeDSL
             case WILD()                 => emptyTrees(roots.length)
           })
           
-          (row, FinalState(index, body, pattern.definedVars))
-        }
+          row -> FinalState(index, body, pattern.deepBoundVariables)
+        })
       )
-      
-      tracing("Expanded", new ExpandedMatrix(rows, finals))
-    }
 
     /** returns the condition in "if (cond) k1 else k2" 
      */

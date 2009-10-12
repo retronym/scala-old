@@ -1,17 +1,19 @@
+// Seems to be fixed in trunk
 
-
-As discussed here: http://www.nabble.com/Companion-object-constructor-visibility-td24342096.html
+// As discussed here: http://www.nabble.com/Companion-object-constructor-visibility-td24342096.html
 
 //Simplified example:
 
-    class Foo private (val value : Int)
+    class Test private (val value : Int)
 
-    abstract class Bar(val ctor : (Int) => Foo)
+    abstract class Bar(val ctor : (Int) => Test)
 
-    object Foo extends Bar(new Foo(_)) //<--- ILLEGAL ACCESS
+    object Test extends Bar(new Test(_)) { //<--- ILLEGAL ACCESS
+      def main(args: Array[String]){}
+    }
 
 //however the following is legal:
-
+/*
     class Foo private (val value : Int)
 
     abstract class Bar{
@@ -27,3 +29,4 @@ As discussed here: http://www.nabble.com/Companion-object-constructor-visibility
     }
 
 The constructor invocation of Bar is done within the scope of object Foo's constructor, and therefor the private constructor of Foo should be visible and accessible.
+*/
