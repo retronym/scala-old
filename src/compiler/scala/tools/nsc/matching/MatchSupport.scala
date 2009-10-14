@@ -111,6 +111,9 @@ trait MatchSupport extends ast.TreeDSL
         
     object compactTreePrinter extends CompactTreePrinter
 
+    // def treeChildrenString(t: Tree): String =
+    //   nodeToString(t)
+      
     def treeToCompactString(t: Tree): String = {
       val buffer = new StringWriter()
       val printer = compactTreePrinter.create(new PrintWriter(buffer))
@@ -178,13 +181,26 @@ trait MatchSupport extends ast.TreeDSL
           case Block(stmts, expr) => (stmts flatMap allStatements) ::: List(expr)
           case _                  => List(t)
         }
+        
+        def printLogicalOr(t1: (Tree, Boolean), t2: (Tree, Boolean)) =
+          printLogicalOp(t1, t2, "||")
+        
+        def printLogicalAnd(t1: (Tree, Boolean), t2: (Tree, Boolean)) =
+          printLogicalOp(t1, t2, "&&")
+          
+        def printLogicalOp(t1: (Tree, Boolean), t2: (Tree, Boolean), op: String) = {
+          def maybenot(tvalue: Boolean) = if (tvalue) "" else "!"
+
+          printRow(List(t1._1, t2._1), 
+            " %s(" format maybenot(t1._2),
+            ") %s %s(".format(op, maybenot(t2._2)),
+            ")"
+          )
+        }
 
         override def printRaw(tree: Tree): Unit = {
           // routing supercalls through this for debugging ease
-          def s() = {
-            // Console.println("toSuper: " + tree.getClass)
-            super.printRaw(tree)
-          }
+          def s() = super.printRaw(tree)
 
           tree match {
             // labels used for jumps - does not map to valid scala code
@@ -202,8 +218,6 @@ trait MatchSupport extends ast.TreeDSL
                 case _                        => s()
               }
 
-            // case Select(Select(_, x), y) if x.toString == "this" =>
-            //   print(symName(tree, y))
             // target.unary_! ==> !target
             case Select(qualifier, name) =>
               val n = symName(tree, name)          
@@ -222,6 +236,22 @@ trait MatchSupport extends ast.TreeDSL
                 case List(x)            => printRow(List(x), "", ";", "")
                 case _                  => s()
               }
+            
+            // We get a lot of this stuff
+            case If( IsTrue(), x, _)        => printRaw(x)
+            case If(IsFalse(), _, x)        => printRaw(x)
+            
+            case If(cond,  IsTrue(), elsep) =>
+              printLogicalOr(cond -> true, elsep -> true)
+              
+            case If(cond, IsFalse(), elsep) => 
+              printLogicalAnd(cond -> false, elsep -> true)
+              
+            case If(cond,  thenp, IsTrue()) =>
+              printLogicalOr(cond -> false, thenp -> true)
+              
+            case If(cond,  thenp, IsFalse()) =>
+              printLogicalAnd(cond -> true, thenp -> true)
 
             // If thenp or elsep has only one statement, it doesn't need more than one line.
             case If(cond, thenp, elsep) =>

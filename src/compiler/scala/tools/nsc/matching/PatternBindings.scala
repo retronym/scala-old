@@ -50,13 +50,14 @@ trait PatternBindings extends ast.TreeDSL
     // bound variables beneath them return a list of said patterns for flatMapping.
     def subpatternsForVars: List[Pattern] = Nil
     
-    // This is what calls subpatternsForVars.
-    // XXX reverse?
-    def deepBoundVariables: List[Symbol] = deepstrip(boundTree)
-    // (boundVariables ::: otherBoundVariables).reverse
-    
     private def shallowBoundVariables = strip(boundTree)
     private def otherBoundVariables = subpatternsForVars flatMap (_.deepBoundVariables)
+    
+    def deepBoundVariables: List[Symbol] = shallowBoundVariables ::: otherBoundVariables
+    // An indiscriminate deep search would be:
+    //
+    // def deepBoundVariables = deepstrip(boundTree)
+    
     lazy val boundVariables = {
       val res = shallowBoundVariables
       val deep = deepBoundVariables
@@ -72,7 +73,7 @@ trait PatternBindings extends ast.TreeDSL
     def boundTree = if (_boundTree == null) tree else _boundTree
     def withBoundTree(x: Bind): this.type = {
       _boundTree = x
-      this
+      tracing[this.type]("Bound", this)
     }
     
     // If a tree has bindings, boundTree looks something like
@@ -142,7 +143,9 @@ trait PatternBindings extends ast.TreeDSL
       new Bindings(newBindings ++ vlist)
     }
 
-    override def toString() = pp(vlist)
+    override def toString() = 
+      if (vlist.isEmpty) "No Bindings"
+      else "%d Bindings(%s)".format(vlist.size, pp(vlist))
   }
 
   val NoBinding: Bindings = new Bindings(Nil)
