@@ -4,12 +4,14 @@
     <facet type="Scala" name="Scala">
       <configuration>
         <option name="takeFromSettings" value="true" />
-        <option name="myScalaCompilerJarPath" value="$MODULE_DIR$/build/palo/lib/scala-compiler.jar" />
-        <option name="myScalaSdkJarPath" value="$MODULE_DIR$/build/palo/lib/scala-library.jar" />
+        <option name="myScalaCompilerJarPath" value="$MODULE_DIR$/build/locker/classes/compiler:/localhome/dragos/workspace-laptop/git/scala/lib/fjbg.jar" />
+        <option name="myScalaSdkJarPath" value="$MODULE_DIR$/build/locker/classes/library" />
       </configuration>
     </facet>
   </component>
-  <component name="NewModuleRootManager" inherit-compiler-output="true">
+  <component name="NewModuleRootManager" inherit-compiler-output="false">
+    <output url="file://$MODULE_DIR$/build/quick/classes/compiler" />
+    <output-test url="file://$MODULE_DIR$/out/test/compiler" />
     <exclude-output />
     <content url="file://$MODULE_DIR$/src/compiler">
       <sourceFolder url="file://$MODULE_DIR$/src/compiler" isTestSource="false" />

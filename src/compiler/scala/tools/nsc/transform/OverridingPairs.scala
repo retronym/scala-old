@@ -10,6 +10,7 @@ package transform
 import collection.mutable.HashMap
 import symtab.Flags._
 import util.HashSet
+import annotation.tailrec
 
 /** A class that yields a kind of iterator (`Cursor`),
  *  which yields all pairs of overriding/overridden symbols
@@ -76,7 +77,7 @@ abstract class OverridingPairs {
     }
 
     /** The symbols that can take part in an overriding pair */
-    private val decls = newScope
+    private val decls = new Scope
 
     // fill `decls` with overriding shadowing overridden */
     { def fillDecls(bcs: List[Symbol], deferredflag: Int) {
@@ -147,7 +148,7 @@ abstract class OverridingPairs {
      *  (maybe excluded because of hasCommonParentAsSubclass).
      *  These will not appear as overriding
      */
-    private val visited = new HashSet[ScopeEntry](256)
+    private val visited = new HashSet[ScopeEntry]("visited", 64)
 
     /** The current entry candidate for overriding
      */
@@ -165,7 +166,8 @@ abstract class OverridingPairs {
     //@M: note that next is called once during object initialisation
     def hasNext: Boolean = curEntry ne null
 
-    def next {
+    @tailrec
+    final def next {
       if (curEntry ne null) {
         overriding = curEntry.sym
         if (nextEntry ne null) {

@@ -203,9 +203,14 @@ INITIALISATION
 ============================================================================ -->
 
   <target name="init">
-  <!-- The scalac.args.optimise is selectively overridden in certain antcall tasks. -->
+  <!-- scalac.args.optimise is selectively overridden in certain antcall tasks. -->
     <property name="scalac.args.optimise" value=""/>
+  <!-- scalac.args.quickonly are added to quick.* targets but not others (particularly, locker.)
+       This is to facilitate testing new command line options which do not yet exist in starr. -->
+	<property name="scalac.args.quickonly" value=""/>
+	
     <property name="scalac.args.all" value="${scalac.args} ${scalac.args.optimise}"/>
+	<property name="scalac.args.quick" value="${scalac.args.all} ${scalac.args.quickonly}"/>
   <!-- Setting-up Ant contrib tasks -->
     <taskdef resource="net/sf/antcontrib/antlib.xml" classpath="${lib.dir}/ant/ant-contrib.jar"/>
   <!-- This is the start time for the distribution -->
@@ -240,6 +245,7 @@ INITIALISATION
       <pathelement location="${lib.starr.jar}"/>
       <pathelement location="${comp.starr.jar}"/>
       <pathelement location="${lib.dir}/fjbg.jar"/>
+      <pathelement location="${lib.dir}/msil.jar"/>
       <pathelement location="${ant.jar}"/>
     </path>
     <taskdef resource="scala/tools/ant/sabbus/antlib.xml" classpathref="starr.classpath"/>
@@ -366,6 +372,7 @@ LOCAL REFERENCE BUILD (LOCKER)
       <pathelement location="${build-locker.dir}/classes/library"/>
       <pathelement location="${build-locker.dir}/classes/compiler"/>
       <pathelement location="${lib.dir}/fjbg.jar"/>
+      <pathelement location="${lib.dir}/msil.jar"/>
       <pathelement location="${ant.jar}"/>
     </path>
   </target>
@@ -462,7 +469,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="scala/Predef.scala"/>
@@ -475,7 +482,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/library"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -489,7 +496,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/actors"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -501,7 +508,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/dbc"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -513,7 +520,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/library"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/library"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/swing"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -562,7 +569,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/compiler"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/compiler"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/compiler"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -604,7 +611,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/scalap"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/scalap"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/scalap"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -646,7 +653,7 @@ QUICK BUILD (QUICK)
       destdir="${build-quick.dir}/classes/partest"
       compilerpathref="locker.classpath"
       srcpath="${src.dir}/partest"
-      params="${scalac.args.all}"
+      params="${scalac.args.quick}"
       srcdir="${src.dir}/partest"
       jvmargs="${scalacfork.jvmargs}">
       <include name="**/*.scala"/>
@@ -683,6 +690,7 @@ QUICK BUILD (QUICK)
       <pathelement location="${build-quick.dir}/classes/compiler"/>
       <pathelement location="${build-quick.dir}/classes/scalap"/>
       <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${msil.jar}"/>
       <pathelement location="${jline.jar}"/>
     </path>
     <taskdef name="quick-bin" classname="scala.tools.ant.ScalaTool" classpathref="quick.bin.classpath"/>
@@ -725,6 +733,7 @@ QUICK BUILD (QUICK)
       <pathelement location="${build-quick.dir}/classes/library"/>
       <pathelement location="${build-quick.dir}/classes/compiler"/>
       <pathelement location="${fjbg.jar}"/>
+      <pathelement location="${msil.jar}"/>
       <pathelement location="${ant.jar}"/>
     </path>
   </target>

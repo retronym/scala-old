@@ -17,6 +17,7 @@ class Settings(errorFn: String => Unit) extends ScalacSettings {
 
   // optionizes a system property
   private def syspropopt(name: String): Option[String] = onull(System.getProperty(name))
+  private def sysenvopt(name: String): Option[String] = onull(System.getenv(name))
 
   // given any number of possible path segments, flattens down to a 
   // :-separated style path
@@ -24,7 +25,7 @@ class Settings(errorFn: String => Unit) extends ScalacSettings {
     segments.toList.flatMap(x => x) mkString File.pathSeparator
 
   protected def classpathDefault = 
-    syspropopt("env.classpath") orElse syspropopt("java.class.path") getOrElse ""
+    sysenvopt("CLASSPATH") getOrElse "."
 
   protected def bootclasspathDefault = 
     concatPath(syspropopt("sun.boot.class.path"), guessedScalaBootClassPath)
@@ -35,6 +36,9 @@ class Settings(errorFn: String => Unit) extends ScalacSettings {
 
   protected def extdirsDefault =
     concatPath(syspropopt("java.ext.dirs"), guessedScalaExtDirs)
+
+  protected def assemExtdirsDefault =
+    concatPath(guessedScalaExtDirs)
 
   protected def pluginsDirDefault = 
     guess(List("misc", "scala-devel", "plugins"), _.isDirectory) getOrElse ""
@@ -549,7 +553,8 @@ object Settings {
       }
   }
 
-  /** A setting that accumulates all strings supplied to it */
+  /** A setting that accumulates all strings supplied to it,
+   *  until it encounters one starting with a '-'. */
   class MultiStringSetting private[Settings](
     val name: String,
     val arg: String,
@@ -559,9 +564,11 @@ object Settings {
     protected var v: List[String] = Nil
     def appendToValue(str: String) { value ++= List(str) }
     
-    def tryToSet(args: List[String]) = {      
-      args foreach appendToValue
-      Some(Nil)
+    def tryToSet(args: List[String]) = {
+      val (strings, rest) = args span (x => !x.startsWith("-"))
+      strings foreach appendToValue
+      
+      Some(rest)
     }
     override def tryToSetColon(args: List[String]) = tryToSet(args)
     def unparse: List[String] = value map { name + ":" + _ }
@@ -756,9 +763,10 @@ trait ScalacSettings {
    * -X "Advanced" settings
    */
   val Xhelp         = BooleanSetting    ("-X", "Print a synopsis of advanced options")
-  val assemname     = StringSetting     ("-Xassem", "file", "Name of the output assembly (only relevant with -target:msil)", "").dependsOn(target, "msil")
+  val assemname     = StringSetting     ("-Xassem-name", "file", "Name of the output assembly (only relevant with -target:msil)", "").dependsOn(target, "msil")
   val assemrefs     = StringSetting     ("-Xassem-path", "path", "List of assemblies referenced by the program (only relevant with -target:msil)", ".").dependsOn(target, "msil")
-  val Xchecknull    = BooleanSetting    ("-Xcheck-null", "Emit warning on selection of nullable reference")
+  val assemextdirs  = StringSetting     ("-Xassem-extdirs", "dirs", "List of directories containing assemblies, defaults to `lib'", assemExtdirsDefault).dependsOn(target, "msil")
+  val sourcedir     = StringSetting     ("-Xsourcedir", "directory", "When -target:msil, the source folder structure is mirrored in output directory.", ".").dependsOn(target, "msil")
   val checkInit     = BooleanSetting    ("-Xcheckinit", "Add runtime checks on field accessors. Uninitialized accesses result in an exception being thrown.")
   val noassertions  = BooleanSetting    ("-Xdisable-assertions", "Generate no assertions and assumptions")
   val elideLevel    = IntSetting        ("-Xelide-level", "Generate calls to @elidable-marked methods only method priority is greater than argument.", 
@@ -787,7 +795,6 @@ trait ScalacSettings {
   val Xshowobj      = StringSetting     ("-Xshow-object", "object", "Show object info", "")
   val showPhases    = BooleanSetting    ("-Xshow-phases", "Print a synopsis of compiler phases")
   val sourceReader  = StringSetting     ("-Xsource-reader", "classname", "Specify a custom method for reading source files", "scala.tools.nsc.io.SourceReader")
-  val Xwarninit     = BooleanSetting    ("-Xwarninit", "Warn about possible changes in initialization semantics")
   val newArrays     = BooleanSetting    ("-Ynewarrays", "Generate code for new array scheme")
 
   /**
@@ -824,13 +831,23 @@ trait ScalacSettings {
                       ChoiceSetting     ("-Ystruct-dispatch", "Selects dispatch method for structural refinement method calls",
                         List("no-cache", "mono-cache", "poly-cache", "invoke-dynamic"), "poly-cache") .
                         withHelpSyntax("-Ystruct-dispatch:<method>")
-  val Xwarndeadcode = BooleanSetting    ("-Ywarn-dead-code", "Emit warnings for dead code")
   val specialize    = BooleanSetting    ("-Yspecialize", "Specialize generic code on types.")
   val Yrangepos     = BooleanSetting    ("-Yrangepos", "Use range positions for syntax trees.")
   val Yidedebug     = BooleanSetting    ("-Yide-debug", "Generate, validate and output trees using the interactive compiler.")
   val Ytyperdebug   = BooleanSetting    ("-Ytyper-debug", "Trace all type assignements")
   val Ypmatdebug    = BooleanSetting    ("-Ypmat-debug", "Trace all pattern matcher activity.")
-  val Xwarnings     = BooleanSetting    ("-Xstrict-warnings", "Emit extra (usually spurious) warnings.")
+  val Ytailrec      = BooleanSetting    ("-Ytailrecommend", "Alert methods which would be tail-recursive if private or final.")
+  
+  // Warnings
+  val Xwarninit     = BooleanSetting    ("-Xwarninit", "Warn about possible changes in initialization semantics")
+  val Xchecknull    = BooleanSetting    ("-Xcheck-null", "Emit warning on selection of nullable reference")
+  val Xwarndeadcode = BooleanSetting    ("-Ywarn-dead-code", "Emit warnings for dead code")
+  val YwarnShadow   = BooleanSetting    ("-Ywarn-shadowing", "Emit warnings about possible variable shadowing.")
+  val YwarnCatches  = BooleanSetting    ("-Ywarn-catches", "Emit warnings about catch blocks which catch everything.")
+  val Xwarnings     = BooleanSetting    ("-Xstrict-warnings", "Emit warnings about lots of things.") .
+                          withPostSetHook(() =>
+                            List(YwarnShadow, YwarnCatches, Xwarndeadcode, Xwarninit) foreach (_.value = true)
+                          )
   
   /**
    * -P "Plugin" settings

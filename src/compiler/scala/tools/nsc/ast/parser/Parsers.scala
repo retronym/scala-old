@@ -273,10 +273,7 @@ self =>
     def incompleteInputError(msg: String): Unit
     def deprecationWarning(offset: Int, msg: String): Unit
     private def syntaxError(pos: Position, msg: String, skipIt: Boolean) {
-      pos.offset match {
-        case None => syntaxError(msg,skipIt)
-        case Some(offset) => syntaxError(offset, msg, skipIt)
-      }
+      syntaxError(pos pointOrElse in.offset, msg, skipIt)
     }
     def syntaxError(offset: Int, msg: String): Unit
     def syntaxError(msg: String, skipIt: Boolean) {
@@ -549,7 +546,11 @@ self =>
         val opinfo = opstack.head
         opstack = opstack.tail
         val opPos = r2p(opinfo.offset, opinfo.offset, opinfo.offset+opinfo.operator.length)
-        top = atPos(opinfo.operand.pos.startOrPoint, opinfo.offset) {
+        val lPos = opinfo.operand.pos
+        val start = if (lPos.isDefined) lPos.startOrPoint else  opPos.startOrPoint
+        val rPos = top.pos
+        val end = if (rPos.isDefined) rPos.endOrPoint else opPos.endOrPoint
+        top = atPos(start, opinfo.offset, end) {
           makeBinop(isExpr, opinfo.operand, opinfo.operator, top, opPos)
         }
       }

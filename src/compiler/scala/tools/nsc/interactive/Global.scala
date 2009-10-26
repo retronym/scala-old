@@ -83,8 +83,14 @@ self =>
           pollForWork()
           if (typerRun == currentTyperRun)
             return
-            
-          integrateNew()
+          
+          // @Martin
+          // Guard against NPEs in integrateNew if context.unit == null here.
+          // But why are we doing this at all? If it was non-null previously
+          // integrateNew will already have been called. If it was null previously
+          // it will still be null now?
+          if (context.unit != null)          
+            integrateNew()
           throw new FreshRunReq
         } catch {
           case ex : ValidateError => // Ignore, this will have been reported elsewhere
@@ -386,7 +392,7 @@ self =>
     println("typeMembers at "+tree+" "+tree.tpe)
     val context = doLocateContext(pos)
     val superAccess = tree.isInstanceOf[Super]
-    val scope = newScope
+    val scope = new Scope
     val members = new LinkedHashMap[Symbol, TypeMember]
     def addTypeMember(sym: Symbol, pre: Type, inherited: Boolean, viaView: Symbol) {
       val symtpe = pre.memberType(sym)

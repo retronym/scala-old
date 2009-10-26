@@ -299,8 +299,7 @@ trait ModelToXML extends ModelExtractor {
   protected def decodeOption(tag: String, string: String): NodeSeq =
     <code>{Text(string + " - ")}</code>;
 
-  protected def decodeTag(tag: String): String = 
-    "" + Character.toUpperCase(tag.charAt(0)) + tag.substring(1)
+  protected def decodeTag(tag: String): String = tag.capitalize
   
   def shortHeader(entity: Entity)(implicit from: Frame): NodeSeq =
     <tr>
@@ -350,7 +349,7 @@ trait ModelToXML extends ModelExtractor {
   def attrsFor(entity: Entity)(implicit from: Frame): NodeSeq = {
     def attrFor(attr: AnnotationInfo): Node = {
       val buf = new StringBuilder
-      val AnnotationInfo(tpe, args, nvPairs) = attr
+      val AnnotationInfo(tpe, args, nvPairs, _) = attr
       val name = link(decode(tpe.typeSymbol))
       if (!args.isEmpty)
         buf.append(args.mkString("(", ",", ")"))

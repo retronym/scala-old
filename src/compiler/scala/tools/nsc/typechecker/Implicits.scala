@@ -12,9 +12,8 @@ package scala.tools.nsc
 package typechecker
 
 import scala.collection.mutable.{LinkedHashMap, ListBuffer}
-import scala.tools.nsc.util.{HashSet, Position, Set, NoPosition, SourceFile}
+import scala.tools.nsc.util.{ HashSet, Position, Set, NoPosition, SourceFile }
 import symtab.Flags._
-import util.HashSet
 
 /** This trait provides methods to find various kinds of implicits.
  *
@@ -102,14 +101,11 @@ self: Analyzer =>
     }
 
     override def equals(other: Any) = other match {
-      case that: ImplicitInfo =>
-        if (this eq NoImplicitInfo) that eq this
-        else 
+      case that: ImplicitInfo => 
           this.name == that.name &&
           this.pre =:= that.pre &&
           this.sym == that.sym
-      case _ => 
-        false
+      case _ => false
     }
 
     override def hashCode = 
@@ -119,7 +115,12 @@ self: Analyzer =>
   }
 
   /** A sentinel indicating no implicit was found */
-  val NoImplicitInfo = new ImplicitInfo(null, NoType, NoSymbol)
+  val NoImplicitInfo = new ImplicitInfo(null, NoType, NoSymbol) {
+    // equals used to be implemented in ImplicitInfo with an `if(this eq NoImplicitInfo)` 
+    // overriding the equals here seems cleaner and benchmarks show no difference in performance 
+    override def equals(other: Any) = other match { case that: AnyRef => that eq this  case _ => false }
+    override def hashCode = 1
+  }
 
   /** A constructor for types ?{ name: tp }, used in infer view to member
    *  searches.
@@ -472,7 +473,7 @@ self: Analyzer =>
         }
       }
       def comesBefore(sym: Symbol, owner: Symbol) =
-        sym.pos.offset.getOrElse(0) < owner.pos.offset.getOrElse(Integer.MAX_VALUE) &&
+        sym.pos.pointOrElse(0) < owner.pos.pointOrElse(Integer.MAX_VALUE) &&
         !(owner.ownerChain contains sym)
 
       sym.isInitialized ||
@@ -495,7 +496,7 @@ self: Analyzer =>
                         invalidImplicits: ListBuffer[Symbol]): Map[ImplicitInfo, SearchResult] = {
 
       /** A set containing names that are shadowed by implicit infos */
-      val shadowed = new HashSet[Name](8)
+      lazy val shadowed = new HashSet[Name]("shadowed", 512)
 
       /** Try implicit `info` to see whether it is applicable for expected type `pt`.
        *  This is the case if all of the following holds:
@@ -510,6 +511,7 @@ self: Analyzer =>
         if (containsError(info.tpe) ||
             (isLocal && shadowed.contains(info.name)) || 
             (isView && (info.sym == Predef_identity || info.sym == Predef_conforms))  //@M this condition prevents no-op conversions, which are a problem (besides efficiency), 
+            // TODO: remove `info.sym == Predef_identity` once we have a new STARR that only has conforms as an implicit
             // one example is removeNames in NamesDefaults, which relies on the type checker failing in case of ambiguity between an assignment/named arg
            ) SearchFailure
         else typedImplicit(info)
@@ -621,7 +623,7 @@ self: Analyzer =>
           case TypeRef(pre, sym, args) if (!sym.isPackageClass) =>
             if (sym.isClass && !sym.isRefinementClass && !sym.isAnonymousClass) {
               if (addType(tp)) {
-                for (bc <- sym.info.baseClasses.tail)
+                for (bc <- sym.ancestors)
                   getParts(tp.baseType(bc))
                 getParts(pre)
                 args foreach getParts

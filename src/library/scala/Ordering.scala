@@ -91,6 +91,11 @@ trait Ordering[T] extends Comparator[T] with PartialOrdering[T] {
     override def reverse = outer
     def compare(x: T, y: T) = outer.compare(y, x)
   }
+  
+  /** Given a function U => T, creates Ordering[U]. */
+  def on[U](f: U => T): Ordering[U] = new Ordering[U] {
+    def compare(x: U, y: U) = outer.compare(f(x), f(y))
+  }
  
   class Ops(lhs: T) {
     def <(rhs: T) = lt(lhs, rhs)
@@ -104,16 +109,23 @@ trait Ordering[T] extends Comparator[T] with PartialOrdering[T] {
   implicit def mkOrderingOps(lhs: T): Ops = new Ops(lhs)
 }
 
-object Ordering {
+/** This would conflict with all the nice implicit Orderings
+ *  available, but thanks to the magic of prioritized implicits
+ *  via subclassing we can make Ordered[A] => Ordering[A] only
+ *  turn up if nothing else works.
+ */
+trait LowPriorityOrderingImplicits {
+  implicit def ordered[A <: Ordered[A]]: Ordering[A] = new Ordering[A] {
+    def compare(x: A, y: A) = x.compare(y)
+  }
+}
+
+object Ordering extends LowPriorityOrderingImplicits {
 
   def apply[T](implicit ord : Ordering[T]) = ord
   
   def fromLessThan[T](cmp: (T, T) => Boolean): Ordering[T] = new Ordering[T] {
     def compare(x: T, y: T) = if (cmp(x, y)) -1 else if (cmp(y, x)) 1 else 0
-  }
-
-  def ordered[A <: Ordered[A]]: Ordering[A] = new Ordering[A] {
-    def compare(x: A, y: A) = x.compare(y)
   }
   
   trait UnitOrdering extends Ordering[Unit] {
@@ -162,18 +174,12 @@ object Ordering {
   implicit object Long extends LongOrdering
 
   trait FloatOrdering extends Ordering[Float] {
-    def compare(x: Float, y: Float) =
-      if (x < y) -1
-      else if (x == y) 0
-      else 1
+    def compare(x: Float, y: Float) = java.lang.Float.compare(x, y)
   }
   implicit object Float extends FloatOrdering
 
   trait DoubleOrdering extends Ordering[Double] {
-    def compare(x: Double, y: Double) =
-      if (x < y) -1
-      else if (x == y) 0
-      else 1
+    def compare(x: Double, y: Double) = java.lang.Double.compare(x, y)
   }
   implicit object Double extends DoubleOrdering
 

@@ -1339,7 +1339,11 @@
   </component>
   <component name="ProjectDictionaryState">
     <dictionary name="odersky" />
+<<<<<<< HEAD:scala-lang.ipr
     <dictionary name="jason" />
+=======
+    <dictionary name="dragos" />
+>>>>>>> f2250bed8e3958b683808ebb052a0c4848f60d32:scala-lang.ipr
   </component>
   <component name="ProjectKey">
     <option name="state" value="https://lampsvn.epfl.ch/svn-repos/scala/scala/trunk/scala-lang.ipr" />
@@ -1509,13 +1513,9 @@
     </library>
     <library name="Project Scala SDK">
       <CLASSES>
-        <root url="jar://$PROJECT_DIR$/lib/scala-library.jar!/" />
         <root url="jar://$PROJECT_DIR$/lib/jline.jar!/" />
-        <root url="jar://$PROJECT_DIR$/lib/scala-compiler.jar!/" />
         <root url="jar://$PROJECT_DIR$/lib/fjbg.jar!/" />
-        <root url="jar://$PROJECT_DIR$/lib/ScalaCheckHelper.jar!/" />
         <root url="jar://$PROJECT_DIR$/lib/ScalaCheck.jar!/" />
-        <root url="jar://$PROJECT_DIR$/lib/scala-library-src.jar!/" />
         <root url="jar://$PROJECT_DIR$/lib/msil.jar!/" />
       </CLASSES>
       <JAVADOC />

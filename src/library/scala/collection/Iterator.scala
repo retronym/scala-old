@@ -172,7 +172,7 @@ object Iterator {
 
   /**
    *  @param xs the array of elements
-   *  @see also: Vector.iterator and slice
+   *  @see also: IndexedSeq.iterator and slice
    */
   @deprecated("use `xs.iterator' instead")
   def fromArray[a](xs: Array[a]): Iterator[a] =
@@ -182,7 +182,7 @@ object Iterator {
    *  @param xs     the array of elements
    *  @param start  the start index
    *  @param length  the length
-   *  @see also: Vector.iterator and slice
+   *  @see also: IndexedSeq.iterator and slice
    */
   @deprecated("use `xs.slice(start, start + length).iterator' instead")
   def fromArray[a](xs: Array[a], start: Int, length: Int): Iterator[a] =
@@ -367,6 +367,10 @@ trait Iterator[+A] { self =>
       def next() = { skip(); self.next() }
     }
   }
+  
+  /** !!! Temporary, awaiting more general implementation.
+   */
+  def withFilter(p: A => Boolean) = this.toStream withFilter p
   
   /** Returns an iterator over all the elements of this iterator which
    *  do not satisfy the predicate <code>p</code>.

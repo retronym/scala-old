@@ -20,6 +20,7 @@ abstract class TreeInfo {
 
   val trees: SymbolTable
   import trees._
+  import definitions.ThrowableClass
 
   def isTerm(tree: Tree): Boolean = tree.isTerm
   def isType(tree: Tree): Boolean = tree.isType
@@ -188,7 +189,7 @@ abstract class TreeInfo {
   def isLeftAssoc(operator: Name): Boolean =
     operator.length > 0 && operator(operator.length - 1) != ':'
 
-  private val reserved = new HashSet[Name]
+  private val reserved = new HashSet[Name]("reserved", 64)
   reserved addEntry nme.false_
   reserved addEntry nme.true_
   reserved addEntry nme.null_
@@ -237,6 +238,16 @@ abstract class TreeInfo {
     case CaseDef(Bind(_, Ident(nme.WILDCARD)), EmptyTree, _) => true
     case _ => false
   }
+  
+  /** Does this CaseDef catch Throwable? */
+  def catchesThrowable(cdef: CaseDef) = catchesAllOf(cdef, ThrowableClass.tpe)
+  
+  /** Does this CaseDef catch everything of a certain Type? */
+  def catchesAllOf(cdef: CaseDef, threshold: Type) =
+    isDefaultCase(cdef) || (cdef.guard.isEmpty && (unbind(cdef.pat) match {
+      case Typed(Ident(nme.WILDCARD), tpt)  => (tpt.tpe != null) && (threshold <:< tpt.tpe)
+      case _                                => false
+    }))
 
   /** Is this pattern node a catch-all or type-test pattern? */
   def isCatchCase(cdef: CaseDef) = cdef match {
@@ -251,7 +262,7 @@ abstract class TreeInfo {
   private def isSimpleThrowable(tp: Type): Boolean = tp match {
     case TypeRef(pre, sym, args) =>
       (pre == NoPrefix || pre.widen.typeSymbol.isStatic) &&
-      (sym isNonBottomSubClass definitions.ThrowableClass) &&  /* bq */ !sym.isTrait
+      (sym isNonBottomSubClass ThrowableClass) &&  /* bq */ !sym.isTrait
     case _ =>
       false
   }
@@ -326,14 +337,15 @@ abstract class TreeInfo {
   /** Compilation unit is the predef object
    */
   def isPredefUnit(tree: Tree): Boolean = tree match {
-    case PackageDef(Ident(nme.scala_), List(obj)) => isPredefObj(obj)
+    case PackageDef(Ident(nme.scala_), defs) => isPredefObj(defs)
     case _ => false
   }
 
-  private def isPredefObj(tree: Tree): Boolean = tree match {
-    case ModuleDef(_, nme.Predef, _) => true
-    case DocDef(_, tree1) => isPredefObj(tree1)
-    case Annotated(_, tree1) => isPredefObj(tree1)
+  private def isPredefObj(trees: List[Tree]): Boolean = trees match {
+    case Import(_, _) :: xs => isPredefObj(xs)
+    case ModuleDef(_, nme.Predef, _) :: Nil => true
+    case DocDef(_, tree1) :: Nil => isPredefObj(List(tree1))
+    case Annotated(_, tree1) :: Nil => isPredefObj(List(tree1))
     case _ => false
   }
 

@@ -53,7 +53,7 @@ trait Definitions {
     
     // top types
     lazy val AnyClass     = newClass(ScalaPackageClass, nme.Any, Nil) setFlag (ABSTRACT)
-    lazy val AnyValClass  = newClass(ScalaPackageClass, nme.AnyVal, anyparam) setFlag (FINAL | SEALED)
+    lazy val AnyValClass  = newClass(ScalaPackageClass, nme.AnyVal, anyparam) setFlag (ABSTRACT | SEALED)
     lazy val AnyRefClass  = newAlias(ScalaPackageClass, nme.AnyRef, ObjectClass.typeConstructor)
     lazy val ObjectClass  = getClass(sn.Object)
 
@@ -156,7 +156,7 @@ trait Definitions {
     )
     lazy val EqualsPatternClass = {
       val clazz = newClass(ScalaPackageClass, nme.EQUALS_PATTERN_NAME, Nil) 
-      clazz setInfo PolyType(List(newTypeParam(clazz, 0)), ClassInfoType(anyparam, newClassScope(clazz), clazz))
+      clazz setInfo PolyType(List(newTypeParam(clazz, 0)), ClassInfoType(anyparam, new Scope, clazz))
 
       clazz
     }    
@@ -172,7 +172,7 @@ trait Definitions {
     lazy val SeqModule  = getModule2("scala.Seq", "scala.collection.Seq")
       def Seq_length = getMember(SeqClass, nme.length)
     lazy val RandomAccessSeqMutableClass = getMember(
-      getModule2("scala.RandomAccessSeq", "scala.collection.Vector"), nme.Mutable)
+      getModule2("scala.RandomAccessSeq", "scala.collection.IndexedSeq"), nme.Mutable)
       
     lazy val ListModule   = getModule2("scala.List", "scala.collection.immutable.List")
       def List_apply = getMember(ListModule, nme.apply)
@@ -460,7 +460,7 @@ trait Definitions {
 
     private def newClass(owner: Symbol, name: Name, parents: List[Type]): Symbol = {
       val clazz = owner.newClass(NoPosition, name.toTypeName)
-      clazz.setInfo(ClassInfoType(parents, newClassScope(clazz), clazz))
+      clazz.setInfo(ClassInfoType(parents, new Scope, clazz))
       owner.info.decls.enter(clazz) 
       clazz
     }
@@ -478,7 +478,7 @@ trait Definitions {
       clazz.setInfo(
         PolyType(
           List(tparam),
-          ClassInfoType(List(AnyRefClass.tpe, p), newClassScope(clazz), clazz)))
+          ClassInfoType(List(AnyRefClass.tpe, p), new Scope, clazz)))
     }
 
     private def newAlias(owner: Symbol, name: Name, alias: Type): Symbol = {
@@ -553,7 +553,7 @@ trait Definitions {
       val module = ScalaPackageClass.newModule(NoPosition, name)
       ScalaPackageClass.info.decls.enter(module)
       val mclass = module.moduleClass
-      mclass.setInfo(ClassInfoType(List(), newClassScope(mclass), mclass))
+      mclass.setInfo(ClassInfoType(List(), new Scope, mclass))
       module.setInfo(mclass.tpe)
 
       val box = newMethod(mclass, nme.box, List(clazz.typeConstructor),
@@ -720,7 +720,7 @@ trait Definitions {
       if (isInitialized) return
       isInitialized = true
 
-      EmptyPackageClass.setInfo(ClassInfoType(List(), newClassScope(EmptyPackageClass), EmptyPackageClass))
+      EmptyPackageClass.setInfo(ClassInfoType(List(), new Scope, EmptyPackageClass))
       EmptyPackage.setInfo(EmptyPackageClass.tpe)
       RootClass.info.decls.enter(EmptyPackage)
       RootClass.info.decls.enter(RootPackage)
