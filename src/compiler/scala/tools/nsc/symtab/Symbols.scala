@@ -116,7 +116,7 @@ trait Symbols {
       // see "def typeSig" in Namers
       val annots1 = initialize.rawannots map {
         case LazyAnnotationInfo(annot) => annot()
-        case a @ AnnotationInfo(_, _, _, _) => a
+        case a @ AnnotationInfo(_, _, _) => a
       } filter { a => !a.atp.isError }
       rawannots = annots1
       annots1
@@ -1888,6 +1888,7 @@ trait Symbols {
     }
 
     override def cloneSymbolImpl(owner: Symbol): Symbol = {
+      assert(!isModuleClass)
       val clone = new ClassSymbol(owner, pos, name)
       if (thisSym != this) {
         clone.typeOfThis = typeOfThis
