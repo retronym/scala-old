@@ -11,7 +11,8 @@
 
 package scala.collection
 
-import mutable.{Buffer, ArrayBuffer, ListBuffer}
+import mutable.{Buffer, ArrayBuffer, ListBuffer, StringBuilder}
+import immutable.{List, Stream}
 import annotation.{ tailrec, experimental }
 // import immutable.{List, Nil, ::, Stream}
 
@@ -369,8 +370,9 @@ trait Iterator[+A] { self =>
   }
   
   /** !!! Temporary, awaiting more general implementation.
+   *  ... better wait longer, this fails once flatMap gets in the mix.
    */
-  def withFilter(p: A => Boolean) = this.toStream withFilter p
+  // def withFilter(p: A => Boolean) = this.toStream withFilter p
   
   /** Returns an iterator over all the elements of this iterator which
    *  do not satisfy the predicate <code>p</code>.

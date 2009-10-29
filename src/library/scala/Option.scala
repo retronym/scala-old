@@ -13,6 +13,8 @@ package scala
 
 import Predef._
 import annotation.experimental
+import collection.{Iterator, Iterable}
+import collection.immutable.List
 
 object Option
 {
@@ -80,6 +82,12 @@ sealed abstract class Option[+A] extends Product {
    */
   def getOrElse[B >: A](default: => B): B = 
     if (isEmpty) default else this.get
+  
+  /** If the option is nonempty return its value,
+   *  otherwise return the Zero for this type.
+   */
+  def orZero[B >: A](implicit z: Zero[B]): B =
+    this getOrElse z.zero
 
   /** If the option is nonempty, return a function applied to its value,
    *  wrapped in a Some i.e. <code>Some(f(this.get))</code>.

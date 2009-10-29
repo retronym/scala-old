@@ -12,6 +12,8 @@
 package scala.util.matching
 
 import java.util.regex.{Pattern, Matcher}
+import collection.immutable.List
+import collection.{Iterator, Seq}
 
 /** This class provides methods for creating and using regular expressions.
  *  It is based on the regular expressions of the JDK since 1.4.
@@ -30,6 +32,8 @@ import java.util.regex.{Pattern, Matcher}
  *  @param regex      A string representing a regular expression
  *  @param groupNames A mapping from names to indices in capture groups
  */
+@serializable
+@SerialVersionUID(-2094783597747625537L)
 class Regex(regex: String, groupNames: String*) {
 
   import Regex._
@@ -129,7 +133,7 @@ class Regex(regex: String, groupNames: String*) {
 }
 
 /** This object defines inner classes that describe
- *  regex matches. The class hirrachy is as follows.
+ *  regex matches. The class hierarchy is as follows.
  *
  *            MatchData     
  *              |      \    

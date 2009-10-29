@@ -1514,7 +1514,8 @@ trait Symbols {
 
     /** If settings.uniqid is set, the symbol's id, else "" */
     final def idString: String =
-      if (settings.uniqid.value) "#"+id else ""
+      if (settings.uniqid.value) "#"+id // +" in "+owner.name+"#"+owner.id // DEBUG
+      else ""
 
     /** String representation, including symbol's kind
      *  e.g., "class Foo", "method Bar".
@@ -1887,7 +1888,6 @@ trait Symbols {
     }
 
     override def cloneSymbolImpl(owner: Symbol): Symbol = {
-      assert(!isModuleClass)
       val clone = new ClassSymbol(owner, pos, name)
       if (thisSym != this) {
         clone.typeOfThis = typeOfThis
@@ -1964,7 +1964,9 @@ trait Symbols {
 
   /** An exception for cyclic references of symbol definitions */
   case class CyclicReference(sym: Symbol, info: Type)
-  extends TypeError("illegal cyclic reference involving " + sym)
+  extends TypeError("illegal cyclic reference involving " + sym) {
+    // printStackTrace() // debug
+  }
 
   /** A class for type histories */
   private sealed case class TypeHistory(var validFrom: Period, info: Type, prev: TypeHistory) {
