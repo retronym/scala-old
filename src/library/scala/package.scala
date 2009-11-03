@@ -11,7 +11,7 @@
 
 package object scala {
 
-  type Travarsable[+A] = scala.collection.Traversable[A]
+  type Traversable[+A] = scala.collection.Traversable[A]
   val Traversable = scala.collection.Traversable
 
   type Iterable[+A] = scala.collection.Iterable[A]
@@ -39,6 +39,9 @@ package object scala {
   type Stream[+A] = scala.collection.immutable.Stream[A]
   val Stream = scala.collection.immutable.Stream
   val #:: = scala.collection.immutable.Stream.#::
+
+  type Vector[+A] = scala.collection.immutable.Vector[A]
+  val Vector = scala.collection.immutable.Vector
 
   type StringBuilder = scala.collection.mutable.StringBuilder
   val StringBuilder = scala.collection.mutable.StringBuilder
