@@ -777,7 +777,8 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
 
     /** Compile list of source files */
     def compileSources(_sources: List[SourceFile]) {
-      val sources = dependencyAnalysis.filter(_sources.removeDuplicates) // bug #1268, scalac confused by duplicated filenames
+      val depSources = dependencyAnalysis.filter(_sources.removeDuplicates) // bug #1268, scalac confused by duplicated filenames
+      val sources = pkgObjectsFirst(depSources)
       if (reporter.hasErrors)
         return  // there is a problem already, e.g. a
                 // plugin was passed a bad option
@@ -920,6 +921,20 @@ class Global(var settings: Settings, var reporter: Reporter) extends SymbolTable
         pclazz.setInfo(atPhase(typerPhase)(pclazz.info))
       }
       if (!pclazz.isRoot) resetPackageClass(pclazz.owner)
+    }
+
+    private def pkgObjectsFirst(files: List[SourceFile]) = {
+      def inScalaFolder(f: SourceFile) =
+        f.file.container.name == "scala"
+      val res = new ListBuffer[SourceFile]
+      var scalaObject: Option[SourceFile] = None
+      for (file <- files) file.file.name match {
+        case "ScalaObject.scala" if inScalaFolder(file) => scalaObject = Some(file)
+        case "package.scala" => file +=: res // prepend package objects
+        case _ => res += file                // append all others
+      }
+      scalaObject.map(res.+=:(_)) // ScalaObject 1st
+      res.toList                  // then package objects, then others
     }
   } // class Run
 

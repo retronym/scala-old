@@ -355,15 +355,15 @@ sealed abstract class List[+A] extends LinearSeq[A]
 
   /** <p>
    *    Sort the list according to the comparison function
-   *    <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>,
-   *    which should be true iff <code>e1</code> is smaller than
-   *    <code>e2</code>.
+   *    <code>lt(e1: a, e2: a) =&gt; Boolean</code>,
+   *    which should be true iff <code>e1</code> precedes     
+   *    <code>e2</code> in the desired ordering.
    *  !!! todo: move sorting to IterableLike
    *  </p>
    *
    *  @param lt the comparison function
    *  @return   a list sorted according to the comparison function
-   *            <code>&lt;(e1: a, e2: a) =&gt; Boolean</code>.
+   *            <code>lt(e1: a, e2: a) =&gt; Boolean</code>.
    *  @ex <pre>
    *    List("Steve", "Tom", "John", "Bob")
    *      .sort((e1, e2) => (e1 compareTo e2) &lt; 0) =
