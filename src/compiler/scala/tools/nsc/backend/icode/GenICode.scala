@@ -60,6 +60,7 @@ abstract class GenICode extends SubComponent  {
       else 
         definitions.getMember(definitions.getClass("scala.runtime.Comparator").linkedModuleOfClass, nme.equals_)
 
+
     override def run {
       scalaPrimitives.init
       classes.clear
@@ -1290,10 +1291,7 @@ abstract class GenICode extends SubComponent  {
                         thenCtx: Context,
                         elseCtx: Context): Unit =
     {
-      def genComparisonOp(l: Tree, r: Tree, code: Int) {
-        if (settings.logEqEq.value && isUniversalEqualityOp(code))
-          logEqEq(tree, l, r, code)
-          
+      def genComparisonOp(l: Tree, r: Tree, code: Int) {          
         val op: TestOp = code match {
           case scalaPrimitives.LT => LT
           case scalaPrimitives.LE => LE
@@ -1422,19 +1420,19 @@ abstract class GenICode extends SubComponent  {
         (rsym == ObjectClass) ||
         (lsym != rsym) && (isBoxed(lsym) || isBoxed(rsym))
       }
-      def cannotAvoidBoxesRuntime =
-        settings.logEqEq.value || settings.YwarnEqEq.value || settings.YdieEqEq.value
-      
-      /** We can avoid generating calls to BoxesRuntime only if -Yfuture-eqeq
-       *  is enabled AND none of the eqeq logging options are enabled.
-       */
-      if (mustUseAnyComparator && (!settings.YfutureEqEq.value || cannotAvoidBoxesRuntime)) {
+
+      if (mustUseAnyComparator) {
+        var equalsMethod = BoxesRunTime_equals
+        // when -optimise is on we call the @inline-version of equals, found in ScalaRunTime
+        if (settings.XO.value) {
+          equalsMethod = definitions.getMember(definitions.ScalaRunTimeModule, nme.inlinedEquals)
+          ctx.bb.emit(LOAD_MODULE(definitions.ScalaRunTimeModule))
+        }
         val ctx1 = genLoad(l, ctx, ANY_REF_CLASS)
         val ctx2 = genLoad(r, ctx1, ANY_REF_CLASS)
-        ctx2.bb.emitOnly(
-          CALL_METHOD(BoxesRunTime_equals, Static(false)),
-          CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL)
-        )
+        ctx2.bb.emit(CALL_METHOD(equalsMethod, if (settings.XO.value) Dynamic else Static(false)))
+        ctx2.bb.emit(CZJUMP(thenCtx.bb, elseCtx.bb, NE, BOOL))
+        ctx2.bb.close
       }
       else {
         if (isNull(l))
@@ -2154,20 +2152,5 @@ abstract class GenICode extends SubComponent  {
   object EmptyScope extends Scope(null) {
     override def toString() = "[]"
     override def varsInScope: Buffer[Local] = new ListBuffer
-  }
-  
-  /** Log equality tests between different primitives. */
-  def logEqEq(tree: Tree, l: Tree, r: Tree, code: Int) {
-    import definitions._
-    val op = if (code == scalaPrimitives.EQ) "==" else if (code == scalaPrimitives.NE) "!=" else "??"
-    val tkl = toTypeKind(l.tpe)
-    val tkr = toTypeKind(r.tpe)
-    
-    if (tkl.isNumericType && tkr.isNumericType && tkl != tkr)
-      runtime.Equality.logComparison(
-        "Comparing actual primitives",
-        "%s %s %s".format(l.tpe, op, r.tpe),
-        tree.pos.source + ":" + tree.pos.line
-      )
   }
 }

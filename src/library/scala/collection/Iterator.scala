@@ -13,7 +13,7 @@ package scala.collection
 
 import mutable.{Buffer, ArrayBuffer, ListBuffer, StringBuilder}
 import immutable.{List, Stream}
-import annotation.{ tailrec, experimental }
+import annotation.{ tailrec }
 // import immutable.{List, Nil, ::, Stream}
 
 /** The <code>Iterator</code> object provides various functions for
@@ -390,8 +390,7 @@ trait Iterator[+A] { self =>
   *  @param pf the partial function which filters and maps the iterator.
   *  @return the new iterator.
   */
-  @experimental
-  def filterMap[B](pf: PartialFunction[Any, B]): Iterator[B] = {
+  def partialMap[B](pf: PartialFunction[Any, B]): Iterator[B] = {
     val self = buffered
     new Iterator[B] {
       private def skip() = while (self.hasNext && !pf.isDefinedAt(self.head)) self.next()

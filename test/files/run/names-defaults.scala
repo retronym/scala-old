@@ -13,8 +13,10 @@ object Test extends Application {
 
   // mixing named and positional
   test1(get(4), b = get("@"))
+  test1(a = get(10), get("flu"))
   test2(get(8), v = get(9))(get("%"), l = get(5))
   test3(12, 13)("'", d = 16)
+  test3(a = 1, "swine")(c = "bird", d = 10L)
 
 
   // anonymous functions
@@ -262,6 +264,9 @@ object Test extends Application {
 
   // #2390
   case class A2390[T](x: Int) { def copy(a: Int)(b: Int = 0) = 0 }
+
+  // #2489
+  class A2489 { def foo { def bar(a: Int = 1) = a; bar(); val u = 0 } }
 
   // DEFINITIONS
   def test1(a: Int, b: String) = println(a +": "+ b)

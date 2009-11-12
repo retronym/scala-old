@@ -10,8 +10,10 @@ package classfile
 
 import java.lang.{Float, Double}
 import scala.tools.nsc.util.{Position, NoPosition, ShowPickled}
+import scala.collection.mutable.Set
 import Flags._
 import PickleFormat._
+
 
 /**
  * Serialize a top-level module and/or class.
@@ -65,6 +67,9 @@ abstract class Pickler extends SubComponent {
     private var ep = 0
     private val index = new LinkedHashMap[AnyRef, Int]
 
+    // collect higher-order type params
+    private var locals: Set[Symbol] = Set()
+
 //    private var boundSyms: List[Symbol] = Nil
 
     /** Returns usually symbol's owner, but picks classfile root instead
@@ -76,15 +81,16 @@ abstract class Pickler extends SubComponent {
       else sym.owner
 
     /** Is root in symbol.owner*, or should it be treated as a local symbol
-     *  anyway? This is the case if symbol is a refinement class or
-     *  an existentially bound variable.
+     *  anyway? This is the case if symbol is a refinement class,
+     *  an existentially bound variable, or a higher-order type parameter.
      */
     private def isLocal(sym: Symbol): Boolean =
       !sym.isPackageClass &&
       (sym.name.toTermName == rootName && sym.owner == rootOwner ||
        sym != NoSymbol && isLocal(sym.owner) ||
        sym.isRefinementClass ||
-       sym.isAbstractType && sym.hasFlag(EXISTENTIAL))
+       sym.isAbstractType && sym.hasFlag(EXISTENTIAL) || // existential param
+       (locals contains sym)) // higher-order type param
 
     private def staticAnnotations(annots: List[AnnotationInfo]) =
       annots filter(ann =>
@@ -185,9 +191,12 @@ abstract class Pickler extends SubComponent {
         case MethodType(params, restpe) =>
           putType(restpe); putSymbols(params)
         case PolyType(tparams, restpe) =>
+          tparams foreach { tparam => 
+            if (!isLocal(tparam)) locals += tparam // similar to existential types, these tparams are local
+          }
           putType(restpe); putSymbols(tparams)
         case ExistentialType(tparams, restpe) =>
-//          val savedBoundSyms = boundSyms
+//          val savedBoundSyms = boundSyms // boundSyms are known to be local based on the EXISTENTIAL flag  (see isLocal)
 //          boundSyms = tparams ::: boundSyms
 //          try {
             putType(restpe); 

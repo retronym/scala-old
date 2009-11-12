@@ -384,7 +384,7 @@ self: Analyzer =>
           }
         }
 
-      if (traceImplicits) println("typed impl for "+wildPt+"? "+info.name+":"+depoly(info.tpe)+"/"+undetParams+"/"+isPlausiblyCompatible(info.tpe, wildPt)+"/"+matchesPt(depoly(info.tpe), wildPt, List()))
+      //if (traceImplicits) println("typed impl for "+wildPt+"? "+info.name+":"+depoly(info.tpe)+"/"+undetParams+"/"+isPlausiblyCompatible(info.tpe, wildPt)+"/"+matchesPt(depoly(info.tpe), wildPt, List()))
       if (isPlausiblyCompatible(info.tpe, wildPt) && 
           matchesPt(depoly(info.tpe), wildPt, List()) && 
           isStable(info.pre)) {
@@ -431,10 +431,18 @@ self: Analyzer =>
               val targs = solvedTypes(tvars, undetParams, undetParams map varianceInType(pt),
                                       false, lubDepth(List(itree2.tpe, pt)))
               checkBounds(itree2.pos, NoPrefix, NoSymbol, undetParams, targs, "inferred ") // #2421        
-              val subst = new TreeTypeSubstituter(undetParams, targs)
+
+              // filter out failures from type inference, don't want to remove them from undetParams!
+              // we must be conservative in leaving type params in undetparams
+              val uninstantiated = new ListBuffer[Symbol]
+              val detargs = adjustTypeArgs(undetParams, targs, WildcardType, uninstantiated)  // prototype == WildcardType: want to remove all inferred Nothing's
+              // even if Nothing was inferred correctly, it's okay to ignore it (if it was the only solution, we'll infer it again next time) 
+              val (okParams, okArgs) = (undetParams zip detargs) filter {case (p, a) => !uninstantiated.contains(p)} unzip
+              // TODO: optimise above line(s?) once `zipped filter` works (oh, the irony! this line is needed to get Zipped to type check...)
+
+              val subst = new TreeTypeSubstituter(okParams, okArgs)
               subst traverse itree2 
-              // todo: remove type params that have been instantiated to Nothing, similar
-              // to methTypeArgs
+
               val result = new SearchResult(itree2, subst)
               if (traceImplicits) println("RESULT = "+result)
               // println("RESULT = "+itree+"///"+itree1+"///"+itree2)//DEBUG

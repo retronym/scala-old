@@ -172,7 +172,19 @@ trait Typers { self: Analyzer =>
     def applyImplicitArgs(fun: Tree): Tree = fun.tpe match {
       case MethodType(params, _) =>
         var positional = true
-        val argResults = params map (p => inferImplicit(fun, p.tpe, true, false, context))
+        val argResultsBuff = new ListBuffer[SearchResult]()
+
+        // apply the substitutions (undet type param -> type) that were determined
+        // by implicit resolution of implicit arguments on the left of this argument
+        for(param <- params) {
+          var paramTp = param.tpe
+          for(ar <- argResultsBuff)
+            paramTp = paramTp.subst(ar.subst.from, ar.subst.to)
+
+          argResultsBuff += inferImplicit(fun, paramTp, true, false, context)
+        }
+
+        val argResults = argResultsBuff.toList
         val args = argResults.zip(params) flatMap {
           case (arg, param) =>
             if (arg != SearchFailure) {
@@ -937,6 +949,8 @@ trait Typers { self: Analyzer =>
                   // infinite expansion if pt is constant type ()
                   if (sym == UnitClass && tree.tpe <:< AnyClass.tpe) // (12)
                     return typed(atPos(tree.pos)(Block(List(tree), Literal(()))), mode, pt)
+                  else if (isNumericValueClass(sym) && isNumericSubType(tree.tpe, pt))
+                    return typed(atPos(tree.pos)(Select(tree, "to"+sym.name)), mode, pt)
                 case _ =>
               }
               if (!context.undetparams.isEmpty) {
@@ -993,7 +1007,7 @@ trait Typers { self: Analyzer =>
                                      // (if we allow this, we get divergence, e.g., starting at `conforms` during ant quick.bin) 
                                      // note: implicit arguments are still inferred (this kind of "chaining" is allowed)
         if (qtpe.normalize.isInstanceOf[ExistentialType]) {
-          qtpe = qtpe.normalize.skolemizeExistential(context.owner, qual)
+          qtpe = qtpe.normalize.skolemizeExistential(context.owner, qual) // open the existential
           qual setType qtpe
         }
         val coercion = inferView(qual, qtpe, searchTemplate, true)
@@ -1570,12 +1584,29 @@ trait Typers { self: Analyzer =>
         }
       }
     }
-
-    private def checkStructuralCondition(refinement: Symbol, vparam: ValDef) {
-      val tp = vparam.symbol.tpe
-      if (tp.typeSymbol.isAbstractType && !(tp.typeSymbol.hasTransOwner(refinement)))
-        error(vparam.tpt.pos,"Parameter type in structural refinement may not refer to abstract type defined outside that same refinement")
-    }
+      
+    /** Check if a method is defined in such a way that it can be called.
+      * A method cannot be called if it is a non-private member of a structural type
+      * and if its parameter's types are not one of
+      * - this.type
+      * - a type member of the structural type
+      * - an abstract type declared outside of the structural type. */
+    def checkMethodStructuralCompatible(meth: Symbol): Unit =
+      if (meth.owner.isStructuralRefinement && meth.allOverriddenSymbols.isEmpty && (!meth.hasFlag(PRIVATE) && meth.privateWithin == NoSymbol)) {
+        val tp: Type = meth.tpe match {
+          case mt: MethodType => mt
+          case pt: PolyType => pt.resultType
+          case _ => NoType
+        }
+        for (paramType <- tp.paramTypes)  {
+          if (paramType.typeSymbol.isAbstractType && !(paramType.typeSymbol.hasTransOwner(meth.owner)))
+            unit.error(meth.pos,"Parameter type in structural refinement may not refer to an abstract type defined outside that refinement")
+          else if (paramType.typeSymbol.isAbstractType && !(paramType.typeSymbol.hasTransOwner(meth)))
+            unit.error(meth.pos,"Parameter type in structural refinement may not refer to a type member of that refinement")
+          else if (paramType.isInstanceOf[ThisType] && paramType.typeSymbol == meth.owner)
+            unit.error(meth.pos,"Parameter type in structural refinement may not refer to the type of that refinement (self type)")
+        }
+      }
     
     /** does given name name an identifier visible at this point?
      *
@@ -1695,23 +1726,19 @@ trait Typers { self: Analyzer =>
         } else {
           transformedOrTyped(ddef.rhs, tpt1.tpe)
         }
+      
+      checkMethodStructuralCompatible(meth)
+      
       if (meth.isPrimaryConstructor && meth.isClassConstructor && 
           phase.id <= currentRun.typerPhase.id && !reporter.hasErrors)
         computeParamAliases(meth.owner, vparamss1, rhs1)
       if (tpt1.tpe.typeSymbol != NothingClass && !context.returnsSeen) rhs1 = checkDead(rhs1)
 
-      // If only refinement owned methods are checked, invalid code can result; see ticket #2144.
-      def requiresStructuralCheck = meth.allOverriddenSymbols.isEmpty && (
-        meth.owner.isRefinementClass ||
-        (!meth.isConstructor && !meth.isSetter && meth.owner.isAnonymousClass)
-      )
-      if (requiresStructuralCheck)
-        for (vparam <- ddef.vparamss.flatten)
-          checkStructuralCondition(meth.owner, vparam)
-
       if (phase.id <= currentRun.typerPhase.id && meth.owner.isClass &&
           meth.paramss.exists(ps => ps.exists(_.hasFlag(DEFAULTPARAM)) && isRepeatedParamType(ps.last.tpe)))
         error(meth.pos, "a parameter section with a `*'-parameter is not allowed to have default arguments")
+
+      checkMethodStructuralCompatible(meth)
 
       treeCopy.DefDef(ddef, typedMods, ddef.name, tparams1, vparamss1, tpt1, rhs1) setType NoType
     }
@@ -1767,6 +1794,33 @@ trait Typers { self: Analyzer =>
         }
         if (settings.YwarnShadow.value) checkShadowings(stat)
         enterLabelDef(stat)
+      }
+      if (phaseId(currentPeriod) <= currentRun.typerPhase.id) {
+        block match {
+          case block @ Block(List(classDef @ ClassDef(_, _, _, _)), newInst @ Apply(Select(New(_), _), _)) =>
+            // The block is an anonymous class definitions/instantiation pair
+            //   -> members that are hidden by the type of the block are made private
+            val visibleMembers = pt match {
+              case WildcardType => classDef.symbol.info.decls.toList
+              case BoundedWildcardType(TypeBounds(lo, hi)) => lo.members
+              case _ => pt.members
+            }
+            for (member <- classDef.symbol.info.decls.toList
+                 if member.isTerm && !member.isConstructor &&
+                    member.allOverriddenSymbols.isEmpty &&
+                    (!member.hasFlag(PRIVATE) && member.privateWithin == NoSymbol) &&
+                    !(visibleMembers exists { visible =>
+                      visible.name == member.name &&
+                      member.tpe <:< visible.tpe.substThis(visible.owner, ThisType(classDef.symbol))
+                    })
+            ) {
+              member.resetFlag(PROTECTED)
+              member.resetFlag(LOCAL)
+              member.setFlag(PRIVATE)
+              member.privateWithin = NoSymbol
+            }
+          case _ =>
+        }
       }
       val stats1 = typedStats(block.stats, context.owner)
       val expr1 = typed(block.expr, mode & ~(FUNmode | QUALmode), pt)
@@ -2000,7 +2054,7 @@ trait Typers { self: Analyzer =>
         moreToAdd = initSize != scope.size
         }
         if (newStats.isEmpty) stats
-        else stats ::: newStats.toList
+        else newStats.toList ::: stats
       }
       val result = stats mapConserve (typedStat)
       if (phase.erasedTypes) result
@@ -2755,7 +2809,7 @@ trait Typers { self: Analyzer =>
      */
     protected def typed1(tree: Tree, mode: Int, pt: Type): Tree = {
       //Console.println("typed1("+tree.getClass()+","+Integer.toHexString(mode)+","+pt+")")
-      def ptOrLub(tps: List[Type]) = if (isFullyDefined(pt)) pt else lub(tps map (_.deconst))
+      def ptOrLub(tps: List[Type]) = if (isFullyDefined(pt)) pt else weakLub(tps map (_.deconst))
       
       //@M! get the type of the qualifier in a Select tree, otherwise: NoType
       def prefixType(fun: Tree): Type = fun match { 
@@ -2920,9 +2974,14 @@ trait Typers { self: Analyzer =>
           val thenp1 = typed(thenp, UnitClass.tpe)
           treeCopy.If(tree, cond1, thenp1, elsep) setType thenp1.tpe
         } else { 
-          val thenp1 = typed(thenp, pt)
-          val elsep1 = typed(elsep, pt)
-          treeCopy.If(tree, cond1, thenp1, elsep1) setType ptOrLub(List(thenp1.tpe, elsep1.tpe))
+          var thenp1 = typed(thenp, pt)
+          var elsep1 = typed(elsep, pt)
+          val owntype = ptOrLub(List(thenp1.tpe, elsep1.tpe))
+          if (isNumericValueType(owntype)) {
+            thenp1 = adapt(thenp1, mode, owntype)
+            elsep1 = adapt(elsep1, mode, owntype)
+          }
+          treeCopy.If(tree, cond1, thenp1, elsep1) setType owntype
         }
       }
 
@@ -3553,6 +3612,9 @@ trait Typers { self: Analyzer =>
         }
       }
 
+      def adaptCase(cdef: CaseDef, tpe: Type): CaseDef = 
+        treeCopy.CaseDef(cdef, cdef.pat, cdef.guard, adapt(cdef.body, mode, tpe))
+
       // begin typed1
       val sym: Symbol = tree.symbol
       if ((sym ne null) && (sym ne NoSymbol)) sym.initialize 
@@ -3648,20 +3710,28 @@ trait Typers { self: Analyzer =>
             typed1(atPos(tree.pos) { Function(params, body) }, mode, pt)
           } else {
             val selector1 = checkDead(typed(selector))
-            val cases1 = typedCases(tree, cases, selector1.tpe.widen, pt)
-            treeCopy.Match(tree, selector1, cases1) setType ptOrLub(cases1 map (_.tpe))
+            var cases1 = typedCases(tree, cases, selector1.tpe.widen, pt)
+            val owntype = ptOrLub(cases1 map (_.tpe))
+            if (isNumericValueType(owntype)) {
+              cases1 = cases1 map (adaptCase(_, owntype))
+            }
+            treeCopy.Match(tree, selector1, cases1) setType owntype
           }
 
         case Return(expr) =>
           typedReturn(expr)
 
         case Try(block, catches, finalizer) =>
-          val block1 = typed(block, pt)
-          val catches1 = typedCases(tree, catches, ThrowableClass.tpe, pt)
+          var block1 = typed(block, pt)
+          var catches1 = typedCases(tree, catches, ThrowableClass.tpe, pt)
           val finalizer1 = if (finalizer.isEmpty) finalizer
                            else typed(finalizer, UnitClass.tpe)
-          treeCopy.Try(tree, block1, catches1, finalizer1)
-            .setType(ptOrLub(block1.tpe :: (catches1 map (_.tpe))))
+          val owntype = ptOrLub(block1.tpe :: (catches1 map (_.tpe)))
+          if (isNumericValueType(owntype)) {
+            block1 = adapt(block1, mode, owntype)
+            catches1 = catches1 map (adaptCase(_, owntype))
+          }
+          treeCopy.Try(tree, block1, catches1, finalizer1) setType owntype
 
         case Throw(expr) =>
           val expr1 = typed(expr, ThrowableClass.tpe)

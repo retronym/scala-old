@@ -98,14 +98,14 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
       var sym: Symbol = NoSymbol
       if (settings.debug.value)
         log("starting rebindsuper " + base + " " + member + ":" + member.tpe +
-            " " + mixinClass + " " + base.info.baseClasses)
+            " " + mixinClass + " " + base.info.baseClasses + "/" + bcs)
       while (!bcs.isEmpty && sym == NoSymbol) {
         if (settings.debug.value) {
           val other = bcs.head.info.nonPrivateDecl(member.name);
           log("rebindsuper " + bcs.head + " " + other + " " + other.tpe +
               " " + other.isDeferred)
         }
-        sym = member.overridingSymbol(bcs.head).suchThat(sym => !sym.hasFlag(DEFERRED | BRIDGE))
+        sym = member.matchingSymbol(bcs.head, base.thisType).suchThat(sym => !sym.hasFlag(DEFERRED | BRIDGE))
         bcs = bcs.tail
       }
       assert(sym != NoSymbol, member)
@@ -278,13 +278,16 @@ abstract class Mixin extends InfoTransform with ast.TreeDSL {
                     // member is a value of type unit. No field needed
                     ;
                   case _ =>
+                    // atPhase: the private field is moved to the implementation class by erasure,
+                    // so it can no longer be found in the member's owner (the trait)
+                    val accessed = atPhase(currentRun.picklerPhase)(member.accessed)
                     // otherwise mixin a field as well
                     addMember(clazz,
                               clazz.newValue(member.pos, nme.getterToLocal(member.name))
                               setFlag (LOCAL | PRIVATE | member.getFlag(MUTABLE | LAZY))
                               setFlag (if (!member.hasFlag(STABLE)) MUTABLE else 0)
                               setInfo member.tpe.resultType
-                              setAnnotations member.annotations)
+                              setAnnotations accessed.annotations)
                 }
             }
           } else if (member hasFlag SUPERACCESSOR) { // mixin super accessors

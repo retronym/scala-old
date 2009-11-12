@@ -15,7 +15,6 @@ import generic._
 import scala.reflect.ClassManifest
 import mutable.{Builder, StringBuilder, Buffer, ArrayBuffer, ListBuffer}
 import immutable.{List, Stream, Nil, ::}
-import annotation.experimental
 
 /** <p>
  *    A template trait for traversable collections.
@@ -63,7 +62,7 @@ import annotation.experimental
  *  @version 2.8
  *  @since   2.8
  */
-trait TraversableLike[+A, +Repr] { 
+trait TraversableLike[+A, +Repr] extends HasNewBuilder[A, Repr] { 
 self =>
 
   import Traversable.breaks._
@@ -195,8 +194,7 @@ self =>
   *  @param pf the partial function which filters and maps the traversable.
   *  @return the new traversable.
   */
-  @experimental
-  def filterMap[B, That](pf: PartialFunction[Any, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+  def partialMap[B, That](pf: PartialFunction[Any, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
     for (x <- this) if (pf.isDefinedAt(x)) b += pf(x)
     b.result
@@ -730,9 +728,8 @@ self =>
    */
   def toStream: Stream[A] = toList.toStream
   
-  /** Returns a set with all unique elements in this traversable object.
+  /** Returns an immutable set with all unique elements in this traversable object.
    */
-  @experimental
   def toSet[B >: A]: immutable.Set[B] = immutable.Set() ++ thisCollection
 
   /** Returns a string representation of this traversable object. The resulting string

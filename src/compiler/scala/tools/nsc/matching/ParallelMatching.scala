@@ -31,6 +31,7 @@ trait ParallelMatching extends ast.TreeDSL
   import Types._
   import Debug._
   import Flags.{ TRANS_FLAG }
+  import PartialFunction._
 
   /** Transition **/
   def toPats(xs: List[Tree]): List[Pattern] = xs map Pattern.apply  
@@ -150,7 +151,7 @@ trait ParallelMatching extends ast.TreeDSL
       if (!scrut.isSimple) None
       else {
         val (_lits, others) = ps span isSwitchableConst
-        val lits = _lits filterMap { case x: LiteralPattern => x }
+        val lits = _lits partialMap { case x: LiteralPattern => x }
     
         condOpt(others) {
           case Nil                                => new PatternSwitch(scrut, lits, None)

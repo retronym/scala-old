@@ -5,7 +5,6 @@
 package scala.tools.nsc
 package io
 
-import annotation.experimental
 import concurrent.ThreadRunner
 import scala.util.Properties.{ isWin, isMac }
 import scala.util.control.Exception.catching
@@ -33,13 +32,11 @@ import java.util.concurrent.LinkedBlockingQueue
  *  @since    2.8
  */
  
-@experimental
 object Process
 {
   lazy val javaVmArguments = java.lang.management.ManagementFactory.getRuntimeMXBean().getInputArguments()
   lazy val runtime = Runtime.getRuntime()
   
-  @experimental
   private[Process] class ProcessBuilder(val pb: JProcessBuilder)
   {
     def this(cmd: String*) = this(new JProcessBuilder(cmd: _*))
@@ -105,7 +102,6 @@ object Process
 }
 import Process._
 
-@experimental
 class Process(processCreator: () => JProcess) extends Iterable[String]
 {
   lazy val process = processCreator()
