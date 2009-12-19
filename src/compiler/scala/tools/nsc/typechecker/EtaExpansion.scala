@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -20,12 +20,13 @@ trait EtaExpansion { self: Analyzer =>
   import global._
 
   object etaExpansion {
+    private def isMatch(vparam: ValDef, arg: Tree) = arg match {
+      case Ident(name)  => vparam.name == name
+      case _            => false
+    }
+      
     def unapply(tree: Tree): Option[(List[ValDef], Tree, List[Tree])] = tree match {
-      case Function(vparams, Apply(fn, args)) 
-      if (List.forall2(vparams, args) {
-        case (vparam, Ident(name)) => vparam.name == name
-        case _ => false
-      }) => 
+      case Function(vparams, Apply(fn, args)) if (vparams, args).zipped forall isMatch =>
         Some((vparams, fn, args))
       case _ =>
         None

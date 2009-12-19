@@ -71,7 +71,7 @@ self: scala.tools.nsc.Global =>
     Range(new RangePosition(null, lo, lo, hi), EmptyTree)
 
   /** The maximal free range */
-  private lazy val maxFree: Range = free(0, Math.MAX_INT)
+  private lazy val maxFree: Range = free(0, Int.MaxValue)
 
   /** A singleton list of a non-empty range from `lo` to `hi`, or else the empty List */ 
   private def maybeFree(lo: Int, hi: Int) = 
@@ -258,7 +258,7 @@ self: scala.tools.nsc.Global =>
         if (!t.pos.isTransparent) last = t
         super.traverse(t)
       } else if (t.symbol != null) {
-        for(annot <- t.symbol.annotations if !annot.pos.isTransparent) {
+        for(annot <- t.symbol.annotations if (annot.pos includes pos) && !annot.pos.isTransparent) {
           last = Annotated(TypeTree(annot.atp) setPos annot.pos, t)
           last.setType(annot.atp)
           last.setPos(annot.pos)

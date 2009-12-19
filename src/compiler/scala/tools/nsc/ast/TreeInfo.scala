@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -193,15 +193,6 @@ abstract class TreeInfo {
   reserved addEntry nme.false_
   reserved addEntry nme.true_
   reserved addEntry nme.null_
-  reserved addEntry newTypeName("byte")
-  reserved addEntry newTypeName("char")
-  reserved addEntry newTypeName("short")
-  reserved addEntry newTypeName("int")
-  reserved addEntry newTypeName("long")
-  reserved addEntry newTypeName("float")
-  reserved addEntry newTypeName("double")
-  reserved addEntry newTypeName("boolean")
-  reserved addEntry newTypeName("unit")
 
   /** Is name a variable name? */
   def isVariableName(name: Name): Boolean = {

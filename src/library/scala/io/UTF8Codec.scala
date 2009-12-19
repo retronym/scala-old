@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -17,7 +17,7 @@ package scala.io
 object UTF8Codec
 {
   final val UNI_REPLACEMENT_CHAR: Int = 0x0000FFFD
-  final val UNI_REPLACEMENT_BYTES = encode(UNI_REPLACEMENT_CHAR)
+  final val UNI_REPLACEMENT_BYTES = Array[Byte](-17, -65, -67)
   
   // Note, from http://unicode.org/faq/utf_bom.html#utf8-5
   //

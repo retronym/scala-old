@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -153,9 +153,7 @@ trait Parsers {
 
     def get: Nothing = error("No result when parsing failed")
   }
-  /** An extractor so NoSuccess(msg, next) can be used in matches
-   *  Note: case class inheritance is currently sketchy and may be
-   *  deprecated, so an explicit extractor is better.
+  /** An extractor so NoSuccess(msg, next) can be used in matches.
    */
   object NoSuccess {
     def unapply[T](x: ParseResult[T]) = x match {

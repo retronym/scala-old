@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -22,7 +22,7 @@ import generic._
  *  @version 2.8
  *  @since   1
  */
-@serializable
+@serializable @SerialVersionUID(-7308240733518833071L)
 class LinkedList[A]() extends LinearSeq[A] 
                          with GenericTraversableTemplate[A, LinkedList]
                          with LinkedListLike[A, LinkedList[A]] {

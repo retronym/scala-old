@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala Ant Tasks                      **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -14,11 +14,11 @@ import java.io.{File,PrintWriter,BufferedWriter,FileWriter}
 
 import org.apache.tools.ant.{ BuildException, Project, AntClassLoader }
 import org.apache.tools.ant.taskdefs.{MatchingTask,Java}
-import org.apache.tools.ant.types.{Path, Reference, FileSet}
+import org.apache.tools.ant.types.{Path, Reference}
 import org.apache.tools.ant.util.{FileUtils, GlobPatternMapper,
                                   SourceFileScanner}
 
-import scala.tools.nsc.{Global, Settings}
+import scala.tools.nsc.{Global, Settings, CompilerCommand}
 import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
 
 /** <p>
@@ -72,7 +72,7 @@ import scala.tools.nsc.reporters.{Reporter, ConsoleReporter}
 class Scalac extends MatchingTask {
 
   /** The unique Ant file utilities instance to use in this task. */
-  private val fileUtils = FileUtils.newFileUtils()
+  private val fileUtils = FileUtils.getFileUtils()
 
 /*============================================================================*\
 **                             Ant user-properties                            **
@@ -105,10 +105,10 @@ class Scalac extends MatchingTask {
   /** Defines valid values for the <code>deprecation</code> and
    *  <code>unchecked</code> properties. */
   object Flag extends PermissibleValue {
-    val values = List("yes", "no", "on", "off")
+    val values = List("yes", "no", "on", "off", "true", "false")
     def toBoolean(flag: String) =
-      if (flag == "yes" || flag == "on") Some(true)
-      else if (flag == "no" || flag == "off") Some(false)
+      if (flag == "yes" || flag == "on" || flag == "true") Some(true)
+      else if (flag == "no" || flag == "off" || flag == "false") Some(false)
       else None
   }
 
@@ -477,6 +477,9 @@ class Scalac extends MatchingTask {
 
   /** Initializes settings and source files */
   protected def initialize: (Settings, List[File], Boolean) = {
+    if (scalacDebugging)
+      log("Base directory is `%s`".format(scala.tools.nsc.io.Path("").normalize))
+
     // Tests if all mandatory attributes are set and valid.
     if (origin.isEmpty) error("Attribute 'srcdir' is not set.")
     if (!destination.isEmpty && !destination.get.isDirectory())
@@ -500,7 +503,7 @@ class Scalac extends MatchingTask {
 
       javaOnly = javaOnly && (scalaFiles.length == 0)
       val list = (scalaFiles ++ javaFiles).toList
-      
+
       if (scalacDebugging && !list.isEmpty)
         log("Compiling source file%s: %s to %s".format(
           plural(list),
@@ -558,12 +561,23 @@ class Scalac extends MatchingTask {
     if (!assemrefs.isEmpty) settings.assemrefs.value = assemrefs.get
 
     log("Scalac params = '" + addParams + "'", Project.MSG_DEBUG)
-    settings.parseParams(addParams)
 
-    (settings, sourceFiles, javaOnly)
+    // let CompilerCommand processes all params
+    val command = new CompilerCommand(settings.splitParams(addParams), settings, error, false)
+
+    // resolve dependenciesFile path from project's basedir, so <ant antfile ...> call from other project works.
+    // the dependenciesFile may be relative path to basedir or absolute path, in either case, the following code
+    // will return correct answer.
+    command.settings.dependenciesFile.value match {
+      case "none" =>
+      case x =>
+        val depFilePath = scala.tools.nsc.io.Path(x)
+        command.settings.dependenciesFile.value = scala.tools.nsc.io.Path(getProject.getBaseDir).normalize resolve depFilePath path
+    }
+
+    (command.settings, sourceFiles, javaOnly)
   }
 
-  
   override def execute() {
     val (settings, sourceFiles, javaOnly) = initialize
     if (sourceFiles.isEmpty || javaOnly)
@@ -586,7 +600,7 @@ class Scalac extends MatchingTask {
         if (compilerPath.isDefined) path add compilerPath.get
         else getClass.getClassLoader match {
           case cl: AntClassLoader => path add new Path(getProject, cl.getClasspath)
-          case _                  => error("Cannot determine default classpath for sclac, please specify one!")
+          case _                  => error("Cannot determine default classpath for scalac, please specify one!")
         }
         path
       }

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -10,8 +10,7 @@
 
 package scala.concurrent
 
-import annotation.experimental
-import ops._
+import ops.future
 
 /** A <code>DelayedLazyVal</code> is a wrapper for lengthy
  *  computations which have a valid partially computed result.
@@ -27,7 +26,6 @@ import ops._
  *  @author  Paul Phillips
  *  @version 2.8
  */
-@experimental
 class DelayedLazyVal[T](f: () => T, body: => Unit) {
   @volatile private[this] var isDone = false
   private[this] lazy val complete = f()

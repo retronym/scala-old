@@ -42,10 +42,10 @@ abstract class Changes {
   private def sameType(tp1: Type, tp2: Type) = {
     def typeOf(tp: Type): String = tp.toString + "[" + tp.getClass + "]"
     val res = sameType0(tp1, tp2)
-//    if (!res) println("\t different types: " + typeOf(tp1) + " : " + typeOf(tp2))
+    //if (!res) println("\t different types: " + typeOf(tp1) + " : " + typeOf(tp2))
     res
   }
-
+  
   private def sameType0(tp1: Type, tp2: Type): Boolean = ((tp1, tp2) match {
     /*case (ErrorType, _) => false
     case (WildcardType, _) => false
@@ -88,19 +88,14 @@ abstract class Changes {
     case (MethodType(params1, res1), MethodType(params2, res2)) =>
       // new dependent types: probably fix this, use substSym as done for PolyType
       (sameTypes(tp1.paramTypes, tp2.paramTypes) &&
+      ((tp1.params, tp2.params).zipped forall sameSymbol) &&
        sameType(res1, res2) &&
        tp1.isInstanceOf[ImplicitMethodType] == tp2.isInstanceOf[ImplicitMethodType])
 
     case (PolyType(tparams1, res1), PolyType(tparams2, res2)) =>
-      (tparams1.length == tparams2.length &&
-       List.forall2(tparams1, tparams2)
-       ((p1, p2) => sameType(p1.info, p2.info)) &&
-       sameType(res1, res2))
+      sameTypeParams(tparams1, tparams2) && sameType(res1, res2)
     case (ExistentialType(tparams1, res1), ExistentialType(tparams2, res2)) =>
-      (tparams1.length == tparams2.length &&
-       List.forall2(tparams1, tparams2)
-       ((p1, p2) => sameType(p1.info, p2.info)) &&
-       sameType(res1, res2))
+      sameTypeParams(tparams1, tparams2) && sameType(res1, res2)
     case (TypeBounds(lo1, hi1), TypeBounds(lo2, hi2)) =>
         sameType(lo1, lo2) && sameType(hi1, hi2)
     case (BoundedWildcardType(bounds), _) =>
@@ -133,9 +128,11 @@ abstract class Changes {
       ((tp1n ne tp1) || (tp2n ne tp2)) && sameType(tp1n, tp2n)
     }
 
+  private def sameTypeParams(tparams1: List[Symbol], tparams2: List[Symbol]) =
+    sameTypes(tparams1 map (_.info), tparams2 map (_.info))
+
   def sameTypes(tps1: List[Type], tps2: List[Type]): Boolean = 
-    (tps1.length == tps2.length 
-     && List.forall2(tps1, tps2)(sameType))
+    (tps1.length == tps2.length) && ((tps1, tps2).zipped forall sameType)
 
   /** Return the list of changes between 'from' and 'to'.
    */
@@ -143,6 +140,8 @@ abstract class Changes {
     implicit val defaultReason = "types"
 //     println("changeSet " + from + "(" + from.info + ")"
 //             + " vs " + to + "(" + to.info + ")")
+        
+    def omitSymbols(s: Symbol): Boolean = !s.hasFlag(Flags.LOCAL | Flags.LIFTED | Flags.PRIVATE)
     val cs = new mutable.ListBuffer[Change]
 
     if ((from.info.parents zip to.info.parents) exists { case (t1, t2) => !sameType(t1, t2) })
@@ -152,31 +151,30 @@ abstract class Changes {
 
     // new members not yet visited
     val newMembers = mutable.HashSet[Symbol]()
-    newMembers ++= to.info.decls.iterator
+    newMembers ++= to.info.decls.iterator filter omitSymbols
 
-    for (o <- from.info.decls.iterator; 
-         val n = to.info.decl(o.name)) {
+    for (o <- from.info.decls.iterator filter omitSymbols) {
+      val n = to.info.decl(o.name)
       newMembers -= n
 
-      if (!o.hasFlag(Flags.PRIVATE | Flags.LOCAL | Flags.LIFTED)) {
-        if (o.isClass)
-          cs ++= changeSet(o, n)
-        else if (n == NoSymbol) 
-          cs += Removed(toEntity(o))
-        else {
-          val newSym = n.suchThat(ov => sameType(ov.tpe, o.tpe))
-          if (newSym == NoSymbol || moreRestrictive(o.flags, newSym.flags)) {
-            cs += Changed(toEntity(o))(n + " changed from " + o.tpe + " to " + n.tpe + " flags: " + Flags.flagsToString(o.flags))
-          } else
-            newMembers -= newSym
-        }
+      if (o.isClass)
+        cs ++= changeSet(o, n)
+      else if (n == NoSymbol)
+        cs += Removed(toEntity(o))
+      else {
+        val newSym = n.suchThat(ov => sameType(ov.tpe, o.tpe))
+        if (newSym == NoSymbol || moreRestrictive(o.flags, newSym.flags))
+          cs += Changed(toEntity(o))(n + " changed from " + o.tpe + " to " + n.tpe + " flags: " + Flags.flagsToString(o.flags))
+        else
+          newMembers -= newSym
       }
-    }
-    cs ++= (newMembers map (Added compose toEntity))
+    }: Unit // Give the type explicitly until #2281 is fixed
 
+    cs ++= (newMembers map (Added compose toEntity))
     cs.toList
   }
   def removeChangeSet(sym: Symbol): Change = Removed(toEntity(sym))
+  def changeChangeSet(sym: Symbol, msg: String): Change = Changed(toEntity(sym))(msg)
 
   private def toEntity(sym: Symbol): Entity =
     if (sym.isClass) Class(sym.fullNameString)

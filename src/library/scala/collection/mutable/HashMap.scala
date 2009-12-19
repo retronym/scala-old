@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -17,7 +17,7 @@ import generic._
 /**
  * @since 1
  */
-@serializable @SerialVersionUID(-8682987922734091219L)
+@serializable @SerialVersionUID(1L)
 class HashMap[A, B] extends Map[A, B] 
                        with MapLike[A, B, HashMap[A, B]] 
                        with HashTable[A] {
@@ -58,6 +58,40 @@ class HashMap[A, B] extends Map[A, B]
   def -=(key: A): this.type = { removeEntry(key); this }
 
   def iterator = entriesIterator map {e => (e.key, e.value)}
+  
+  override def foreach[C](f: ((A, B)) => C): Unit = foreachEntry(e => f(e.key, e.value))
+  
+  /* Override to avoid tuple allocation in foreach */
+  override def keySet: collection.Set[A] = new DefaultKeySet {
+    override def foreach[C](f: A => C) = foreachEntry(e => f(e.key))
+  }
+  
+  /* Override to avoid tuple allocation in foreach */
+  override def valuesIterable: collection.Iterable[B] = new DefaultValuesIterable {
+    override def foreach[C](f: B => C) = foreachEntry(e => f(e.value))
+  }
+  
+  /* Override to avoid tuple allocation */
+  override def keysIterator: Iterator[A] = new Iterator[A] {
+    val iter = entriesIterator
+    def hasNext = iter.hasNext
+    def next = iter.next.key
+  }
+  
+  /* Override to avoid tuple allocation */
+  override def valuesIterator: Iterator[B] = new Iterator[B] {
+    val iter = entriesIterator
+    def hasNext = iter.hasNext
+    def next = iter.next.value
+  }
+  
+  private def writeObject(out: java.io.ObjectOutputStream) {
+    serializeTo(out, _.value)
+  }
+  
+  private def readObject(in: java.io.ObjectInputStream) {
+    init[B](in, new Entry(_, _))
+  }
 }
 
 /** This class implements mutable maps using a hashtable.

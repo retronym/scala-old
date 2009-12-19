@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -13,7 +13,6 @@ package scala.collection
 
 import generic._
 import mutable.Builder
-import Math.MAX_INT
 import TraversableView.NoBuilder
 
 /** <p>
@@ -167,7 +166,7 @@ self =>
   
   override def filter(p: A => Boolean): This = newFiltered(p).asInstanceOf[This]
   override def init: This = newSliced(0, size - 1).asInstanceOf[This]
-  override def drop(n: Int): This = newSliced(n max 0, MAX_INT).asInstanceOf[This]
+  override def drop(n: Int): This = newSliced(n max 0, Int.MaxValue).asInstanceOf[This]
   override def take(n: Int): This = newSliced(0, n).asInstanceOf[This]
   override def slice(from: Int, until: Int): This = newSliced(from max 0, until).asInstanceOf[This]
   override def dropWhile(p: A => Boolean): This = newDroppedWhile(p).asInstanceOf[This]

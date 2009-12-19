@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -49,12 +49,6 @@ sealed abstract class Option[+A] extends Product {
    *  @throws Predef.NoSuchElementException if the option is empty.
    */
   def get: A
-
-  @deprecated("use <code>getOrElse</code> instead")
-  def get[B >: A](default: B): B = this match {
-    case None => default
-    case Some(x) => x
-  }
 
   /** If the option is nonempty return its value,
    *  otherwise return the result of evaluating a default expression.
@@ -116,7 +110,7 @@ sealed abstract class Option[+A] extends Product {
    *
    *  @param  pf   the partial function.
    */
-  def partialMap[B](pf: PartialFunction[Any, B]): Option[B] =
+  def partialMap[B](pf: PartialFunction[A, B]): Option[B] =
     if (!isEmpty && pf.isDefinedAt(this.get)) Some(pf(this.get)) else None  
 
   /** If the option is nonempty return it,

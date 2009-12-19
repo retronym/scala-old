@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -38,7 +38,7 @@ class PlainFile(val givenPath: Path) extends AbstractFile {
   /** The absolute file. */
   def absolute = new PlainFile(givenPath.normalize)
     
-  override def container: AbstractFile = new PlainFile(givenPath.parent.get)
+  override def container: AbstractFile = new PlainFile(givenPath.parent)
   override def input = givenPath.toFile.inputStream()
   override def output = givenPath.toFile.outputStream()
   override def sizeOption = Some(givenPath.length.toInt)

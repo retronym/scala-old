@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -18,8 +18,6 @@ import scala.io.{ Source, Codec }
 
 object ConstructingParser {
   def fromFile(inp: File, preserveWS: Boolean) =
-    // XXX why does the default implicit not work here when building locker,
-    // unless the empty parameter list is supplied?
     new ConstructingParser(Source.fromFile(inp)(), preserveWS) initialize
 
   def fromSource(inp: Source, preserveWS: Boolean) =

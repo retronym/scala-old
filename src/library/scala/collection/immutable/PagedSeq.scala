@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -21,7 +21,7 @@ import scala.util.matching.Regex
  *  @since 2.7
  */  
 object PagedSeq {
-  final val UndeterminedEnd = Math.MAX_INT
+  final val UndeterminedEnd = Int.MaxValue
 
   /** Constructs a character sequence from a character iterator */
   def fromIterator[T: ClassManifest](source: Iterator[T]): PagedSeq[T] = 
@@ -182,7 +182,7 @@ extends scala.collection.IndexedSeq[T]
   /** the subsequence from index `start' up to the  
    *  length of the current sequence.
    */
-  override def slice(start: Int) = slice(start, UndeterminedEnd)
+  def slice(start: Int): PagedSeq[T] = slice(start, UndeterminedEnd)
 
   /** Convert sequence to string */
   override def toString = {

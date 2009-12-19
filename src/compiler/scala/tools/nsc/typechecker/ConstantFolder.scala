@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -154,7 +154,7 @@ abstract class ConstantFolder {
   private def foldBinop(op: Name, x: Constant, y: Constant): Constant = {
     val optag =
       if (x.tag == y.tag) x.tag
-      else if (isNumeric(x.tag) && isNumeric(y.tag)) Math.max(x.tag, y.tag)
+      else if (isNumeric(x.tag) && isNumeric(y.tag)) math.max(x.tag, y.tag)
       else NoTag
       
     try optag match {

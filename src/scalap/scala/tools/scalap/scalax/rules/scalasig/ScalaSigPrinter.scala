@@ -1,6 +1,6 @@
 /*     ___ ____ ___   __   ___   ___
 **    / _// __// _ | / /  / _ | / _ \  Scala classfile decoder
-**  __\ \/ /__/ __ |/ /__/ __ |/ ___/  (c) 2003-2009, LAMP/EPFL
+**  __\ \/ /__/ __ |/ /__/ __ |/ ___/  (c) 2003-2010, LAMP/EPFL
 ** /____/\___/_/ |_/____/_/ |_/_/      http://scala-lang.org/
 **
 */
@@ -128,7 +128,7 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
         val baos = new ByteArrayOutputStream
         val stream = new PrintStream(baos)
         val printer = new ScalaSigPrinter(stream, printPrivates)
-//        printer.printMethodType(m.infoType, false)
+        printer.printMethodType(m.infoType, false)(())
         baos.toString
       case None =>
         ""
@@ -308,10 +308,10 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     })
     case TypeRefType(prefix, symbol, typeArgs) => sep + (symbol.path match {
       case "scala.<repeated>" => flags match {
-        case TypeFlags(true) => toString(typeArgs.first) + "*"
+        case TypeFlags(true) => toString(typeArgs.head) + "*"
         case _ => "scala.Seq" + typeArgString(typeArgs)
       }
-      case "scala.<byname>" => "=> " + toString(typeArgs.first)
+      case "scala.<byname>" => "=> " + toString(typeArgs.head)
       case _ => {
         val path = StringUtil.cutSubstring(symbol.path)(".package") //remove package object reference
         StringUtil.trimStart(processName(path) + typeArgString(typeArgs), "<empty>.")
@@ -357,7 +357,7 @@ class ScalaSigPrinter(stream: PrintStream, printPrivates: Boolean) {
     "\\$times" -> "*", "\\$div" -> "/", "\\$bslash" -> "\\\\",
     "\\$greater" -> ">", "\\$qmark" -> "?", "\\$percent" -> "%",
     "\\$amp" -> "&", "\\$colon" -> ":", "\\$u2192" -> "→")
-  val pattern = Pattern.compile(_syms.keys.foldLeft("")((x, y) => if (x == "") y else x + "|" + y))
+  val pattern = Pattern.compile(_syms.keysIterator.foldLeft("")((x, y) => if (x == "") y else x + "|" + y))
   val placeholderPattern = "_\\$(\\d)+"
 
   def processName(name: String) = {

@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2002-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2002-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -176,7 +176,7 @@ abstract class Enumeration(initial: Int, names: String*) {
         val value = m.invoke(this)
         // invoke `id` method
         val idMeth = classOf[Val].getMethod("id")
-        val id: Int = idMeth.invoke(value).asInstanceOf[Integer].intValue()
+        val id: Int = idMeth.invoke(value).asInstanceOf[java.lang.Integer].intValue()
         nmap += (id -> name)
       }
       nmap(i)

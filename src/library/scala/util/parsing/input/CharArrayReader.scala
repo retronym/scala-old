@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -16,9 +16,6 @@ package scala.util.parsing.input
  */
 object CharArrayReader {
   final val EofCh = '\032'
-
-  @deprecated("This should probably be LF instead?")
-  final val CR = '\015'
 }
 
 /** A character array reader reads a stream of characters (keeping track of their positions) 

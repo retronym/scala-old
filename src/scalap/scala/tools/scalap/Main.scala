@@ -1,6 +1,6 @@
 /*     ___ ____ ___   __   ___   ___
 **    / _// __// _ | / /  / _ | / _ \  Scala classfile decoder
-**  __\ \/ /__/ __ |/ /__/ __ |/ ___/  (c) 2003-2009, LAMP/EPFL
+**  __\ \/ /__/ __ |/ /__/ __ |/ ___/  (c) 2003-2010, LAMP/EPFL
 ** /____/\___/_/ |_/____/_/ |_/_/      http://scala-lang.org/
 **
 */
@@ -8,7 +8,6 @@
 // $Id$
 
 package scala.tools.scalap
-
 
 import java.io.{File, PrintStream, OutputStreamWriter, ByteArrayOutputStream}
 import scalax.rules.scalasig._
@@ -46,7 +45,7 @@ object Main {
   def isScalaFile(bytes: Array[Byte]): Boolean = {
     val byteCode = ByteCode(bytes)
     val classFile = ClassFileParser.parse(byteCode)
-    classFile.attribute("ScalaSig") match {case Some(_) => true; case None => false}
+    classFile.attribute("ScalaSig").isDefined
   }
 
   /**Processes the given Java class file.

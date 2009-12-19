@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  *
  * @author  Paul Phillips
  */
@@ -198,6 +198,10 @@ trait TreeDSL {
     def AND(guards: Tree*) =
       if (guards.isEmpty) EmptyTree
       else guards reduceLeft gen.mkAnd
+      
+    def OR(guards: Tree*) =
+      if (guards.isEmpty) EmptyTree
+      else guards reduceLeft gen.mkOr      
     
     def IF(tree: Tree)    = new IfStart(tree, EmptyTree)
     def TRY(tree: Tree)   = new TryStart(tree, Nil, EmptyTree)

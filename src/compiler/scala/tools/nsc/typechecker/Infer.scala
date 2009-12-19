@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -34,6 +34,11 @@ trait Infer {
     assert(tvar.constr.inst != tvar, tvar.origin)
 
   def isVarArgs(formals: List[Type]) = !formals.isEmpty && isRepeatedParamType(formals.last)
+
+  def isWildcard(tp: Type) = tp match {
+    case WildcardType | BoundedWildcardType(_) => true
+    case _ => false
+  }
 
   /** The formal parameter types corresponding to <code>formals</code>.
    *  If <code>formals</code> has a repeated last parameter, a list of
@@ -93,7 +98,7 @@ trait Infer {
   object instantiate extends TypeMap {
     private var excludedVars = scala.collection.immutable.Set[TypeVar]()
     def apply(tp: Type): Type = tp match {
-      case WildcardType | NoType =>
+      case WildcardType | BoundedWildcardType(_) | NoType =>
         throw new NoInstance("undetermined type")
       case tv @ TypeVar(origin, constr) =>
         if (constr.inst == NoType) {
@@ -118,7 +123,7 @@ trait Infer {
    *  @return   ...
    */
   private[typechecker] def isFullyDefined(tp: Type): Boolean = tp match {
-    case WildcardType | NoType =>
+    case WildcardType | BoundedWildcardType(_) | NoType =>
       false
     case NoPrefix | ThisType(_) | ConstantType(_) => 
       true
@@ -181,7 +186,7 @@ trait Infer {
     case MethodType(params, restpe) if (!restpe.isDependent) =>
       if (util.Statistics.enabled) normM += 1
       functionType(params map (_.tpe), normalize(restpe))
-    case PolyType(List(), restpe) =>
+    case PolyType(List(), restpe) => // nullary method type
       if (util.Statistics.enabled) normP += 1
       normalize(restpe)
     case ExistentialType(tparams, qtpe) =>
@@ -237,7 +242,7 @@ trait Infer {
 
     def applyErrorMsg(tree: Tree, msg: String, argtpes: List[Type], pt: Type) =
       treeSymTypeMsg(tree) + msg + argtpes.mkString("(", ",", ")") +
-       (if (pt == WildcardType) "" else " with expected result type " + pt)
+       (if (isWildcard(pt)) "" else " with expected result type " + pt)
 
     // todo: use also for other error messages
     private def existentialContext(tp: Type) = tp.existentialSkolems match {
@@ -404,7 +409,7 @@ trait Infer {
               val l = args.length - 1
               l == formals.length &&
               sym == FunctionClass(l) &&
-              List.forall2(args, formals) (isPlausiblySubType) &&
+              ((args, formals).zipped forall isPlausiblySubType) &&
               isPlausiblySubType(tp.resultApprox, args.last)
             }
           case _ =>
@@ -418,7 +423,8 @@ trait Infer {
       case TypeRef(_, sym1, _) =>
         !sym1.isClass || {
           tp2.normalize match {
-            case TypeRef(_, sym2, _) => !sym2.isClass || (sym1 isSubClass sym2)
+            case TypeRef(_, sym2, _) => 
+              !sym2.isClass || (sym1 isSubClass sym2) || isNumericSubType(tp1, tp2)
             case _ => true
           }
         }
@@ -458,7 +464,7 @@ trait Infer {
     def isCoercible(tp: Type, pt: Type): Boolean = false
 
     def isCompatibleArgs(tps: List[Type], pts: List[Type]): Boolean =
-      List.map2(tps, pts)((tp, pt) => isCompatibleArg(tp, pt)) forall (x => x)
+      (tps, pts).zipped forall isCompatibleArg
 
     /* -- Type instantiation------------------------------------------------ */
 
@@ -495,9 +501,9 @@ trait Infer {
      *  @param pt      ...
      *  @return        ...
      */
-    private def exprTypeArgs(tparams: List[Symbol], restpe: Type, pt: Type): List[Type] = {
+    private def exprTypeArgs(tparams: List[Symbol], restpe: Type, pt: Type, checkCompat: (Type, Type) => Boolean = isCompatible): List[Type] = {
       val tvars = tparams map freshVar
-      if (isCompatible(restpe.instantiateTypeParams(tparams, tvars), pt)) {
+      if (checkCompat(restpe.instantiateTypeParams(tparams, tvars), pt)) {
         try {
           // If the restpe is an implicit method, and the expected type is fully defined
           // optimze type varianbles wrt to the implicit formals only; ignore the result type.
@@ -562,7 +568,7 @@ trait Infer {
       }
       val tvars = tparams map freshVar
       if (isConservativelyCompatible(restpe.instantiateTypeParams(tparams, tvars), pt))
-        List.map2(tparams, tvars) ((tparam, tvar) =>
+        (tparams, tvars).zipped map ((tparam, tvar) =>
           instantiateToBound(tvar, varianceInTypes(formals)(tparam)))
       else 
         tvars map (tvar => WildcardType)
@@ -582,8 +588,9 @@ trait Infer {
       @inline def notCovariantIn(tparam: Symbol, restpe: Type) =
         (varianceInType(restpe)(tparam) & COVARIANT) == 0  // tparam occurred non-covariantly (in invariant or contravariant position)
 
-      List.map2(tparams, targs) {(tparam, targ) =>
-        if (targ.typeSymbol == NothingClass && (restpe == WildcardType || notCovariantIn(tparam, restpe))) {
+      (tparams, targs).zipped map { (tparam, targ) =>
+        if (targ.typeSymbol == NothingClass && 
+            (isWildcard(restpe) || notCovariantIn(tparam, restpe))) {
           uninstantiated += tparam
           tparam.tpeHK  //@M tparam.tpe was wrong: we only want the type constructor,
             // not the type constructor applied to dummy arguments
@@ -659,7 +666,7 @@ trait Infer {
         if (!isFullyDefined(tvar)) tvar.constr.inst = NoType
  
       // Then define remaining type variables from argument types.
-      List.map2(argtpes, formals) {(argtpe, formal) =>
+      (argtpes, formals).zipped map { (argtpe, formal) =>
         //@M isCompatible has side-effect: isSubtype0 will register subtype checks in the tvar's bounds
         if (!isCompatibleArg(argtpe.deconst.instantiateTypeParams(tparams, tvars), 
                              formal.instantiateTypeParams(tparams, tvars))) {
@@ -787,7 +794,8 @@ trait Infer {
               try {
                 val uninstantiated = new ListBuffer[Symbol]
                 val targs = methTypeArgs(undetparams, formals, restpe, argtpes, pt, uninstantiated)
-                (exprTypeArgs(uninstantiated.toList, restpe.instantiateTypeParams(undetparams, targs), pt) ne null) &&
+                // #2665: must use weak conformance, not regular one (follow the monorphic case above)
+                (exprTypeArgs(uninstantiated.toList, restpe.instantiateTypeParams(undetparams, targs), pt, isWeaklyCompatible) ne null) && 
                 isWithinBounds(NoPrefix, NoSymbol, undetparams, targs)
               } catch {
                 case ex: NoInstance => false
@@ -1032,8 +1040,8 @@ trait Infer {
                 (tparams map (_.defString)).mkString("[", ",", "]"))
           if (settings.explaintypes.value) {
             val bounds = tparams map (tp => tp.info.instantiateTypeParams(tparams, targs).bounds)
-            List.map2(targs, bounds)((targ, bound) => explainTypes(bound.lo, targ))
-            List.map2(targs, bounds)((targ, bound) => explainTypes(targ, bound.hi))
+            (targs, bounds).zipped foreach ((targ, bound) => explainTypes(bound.lo, targ))
+            (targs, bounds).zipped foreach ((targ, bound) => explainTypes(targ, bound.hi))
             ()
           }
         }
@@ -1620,7 +1628,7 @@ trait Infer {
      *    assignment expression.
      */
     def inferMethodAlternative(tree: Tree, undetparams: List[Symbol],
-                               argtpes: List[Type], pt0: Type): Unit = tree.tpe match {
+                               argtpes: List[Type], pt0: Type, varArgsOnly: Boolean = false): Unit = tree.tpe match {
       case OverloadedType(pre, alts) =>
         val pt = if (pt0.typeSymbol == UnitClass) WildcardType else pt0
         tryTwice {
@@ -1630,6 +1638,9 @@ trait Infer {
 
           var allApplicable = alts filter (alt =>
             isApplicable(undetparams, followApply(pre.memberType(alt)), argtpes, pt))
+
+          if (varArgsOnly)
+            allApplicable = allApplicable filter (alt => isVarArgs(alt.tpe.paramTypes))
 
           // if there are multiple, drop those that use a default
           // (keep those that use vararg / tupling conversion)
@@ -1736,7 +1747,7 @@ trait Infer {
           if (sym.hasFlag(OVERLOADED)) {
             val tparams = new AsSeenFromMap(pre, sym.alternatives.head.owner).mapOver(
               sym.alternatives.head.typeParams)
-            val bounds = tparams map (_.tpe)  //@M TODO: might be affected by change to tpe in Symbol
+            val bounds = tparams map (_.tpeHK) // see e.g., #1236
             val tpe = 
               PolyType(tparams, 
                        OverloadedType(AntiPolyType(pre, bounds), sym.alternatives))

@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author Martin Odersky
  */
 // $Id$
@@ -182,7 +182,7 @@ trait SyntheticMethods extends ast.TreeDSL {
       }
       
       // Creates list of parameters and a guard for each
-      val (guards, params) = List.map2(clazz.caseFieldAccessors, constrParamTypes)(makeTrees) unzip
+      val (guards, params) = (clazz.caseFieldAccessors, constrParamTypes).zipped map makeTrees unzip
 
       // Verify with canEqual method before returning true.
       def canEqualCheck() = {

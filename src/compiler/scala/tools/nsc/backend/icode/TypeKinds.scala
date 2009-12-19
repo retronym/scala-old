@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -108,6 +108,8 @@ trait TypeKinds { self: ICodes =>
     def dimensions: Int = 0
   }
 
+  var lubs0 = 0
+
   /**
    * The least upper bound of two typekinds. They have to be either
    * REFERENCE or ARRAY kinds.
@@ -116,16 +118,11 @@ trait TypeKinds { self: ICodes =>
    */
   def lub(a: TypeKind, b: TypeKind): TypeKind = {
     def lub0(t1: Type, t2: Type): Type = {
-      val lubTpe = global.lub(t1 :: t2 :: Nil)
-      assert(lubTpe.typeSymbol.isClass,
-             "Least upper bound of " + t1 + " and " + t2 + " is not a class: " + lubTpe)
-      lubTpe
+      //lubs0 += 1
+      global.lub(t1 :: t2 :: Nil)
     }
 
-    if ((a.isReferenceType || a.isArrayType) &&
-        (b.isReferenceType || b.isArrayType))
-      toTypeKind(lub0(a.toType, b.toType))
-    else if (a == b) a
+    if (a == b) a
     else if (a == REFERENCE(NothingClass)) b
     else if (b == REFERENCE(NothingClass)) a
     else (a, b) match {
@@ -136,7 +133,12 @@ trait TypeKinds { self: ICodes =>
       case (SHORT, INT) | (INT, SHORT) => INT
       case (CHAR, INT) | (INT, CHAR) => INT
       case (BOOL, INT) | (INT, BOOL) => INT
-      case _ => throw new CheckerError("Incompatible types: " + a + " with " + b)
+      case _ =>
+        if ((a.isReferenceType || a.isArrayType) &&
+            (b.isReferenceType || b.isArrayType))
+          toTypeKind(lub0(a.toType, b.toType))
+        else
+          throw new CheckerError("Incompatible types: " + a + " with " + b)
     }
   }
 
@@ -162,28 +164,36 @@ trait TypeKinds { self: ICodes =>
   case object BYTE extends TypeKind {
     override def maxType(other: TypeKind): TypeKind = 
       other match {
-        case BYTE | SHORT | CHAR | INT | LONG | FLOAT | DOUBLE => other
+        case CHAR => INT
+        case BYTE | SHORT | INT | LONG | FLOAT | DOUBLE => other
         case REFERENCE(NothingClass) => BYTE
         case _ => abort("Uncomparable type kinds: BYTE with " + other)
       }
   }
+  
+  /** Note that the max of Char/Byte and Char/Short is Int, because
+   *  neither strictly encloses the other due to unsignedness.
+   *  See ticket #2087 for a consequence.
+   */
 
   /** A 2-byte signed integer */
   case object SHORT extends TypeKind {
     override def maxType(other: TypeKind): TypeKind = 
       other match {
-        case BYTE | SHORT | CHAR => SHORT
+        case CHAR => INT
+        case BYTE | SHORT => SHORT
         case REFERENCE(NothingClass) => SHORT
         case INT | LONG | FLOAT | DOUBLE => other
         case _ => abort("Uncomparable type kinds: SHORT with " + other)
       }
   }
 
-  /** A 2-byte signed integer */
+  /** A 2-byte UNSIGNED integer */
   case object CHAR extends TypeKind {
     override def maxType(other: TypeKind): TypeKind =
       other match {
-        case BYTE | SHORT | CHAR => CHAR
+        case CHAR => CHAR
+        case BYTE | SHORT => INT
         case REFERENCE(NothingClass) => CHAR
         case INT | LONG | FLOAT | DOUBLE => other
         case _ => abort("Uncomparable type kinds: CHAR with " + other)
@@ -237,7 +247,7 @@ trait TypeKinds { self: ICodes =>
   //   override def maxType(other: TypeKind): TypeKind = other match {
   //     case STRING => STRING;
   //     case _   =>
-  //       abort("Uncomparbale type kinds: STRING with " + other);
+  //       abort("Uncomparable type kinds: STRING with " + other);
   //   }
   // }
 
@@ -263,7 +273,7 @@ trait TypeKinds { self: ICodes =>
         case REFERENCE(_) | ARRAY(_) =>
           REFERENCE(AnyRefClass)
         case _ =>
-          abort("Uncomparbale type kinds: REFERENCE with " + other)
+          abort("Uncomparable type kinds: REFERENCE with " + other)
       }
 
     /** Checks subtyping relationship. */
@@ -334,7 +344,7 @@ trait TypeKinds { self: ICodes =>
           if (elem == elem2) ARRAY(elem)
           else REFERENCE(AnyRefClass)
         case _ =>
-          abort("Uncomparbale type kinds: ARRAY with " + other)
+          abort("Uncomparable type kinds: ARRAY with " + other)
       }
 
     /** Array subtyping is covariant, as in Java. Necessary for checking 
@@ -370,7 +380,7 @@ trait TypeKinds { self: ICodes =>
         case REFERENCE(_) | ARRAY(_) | BOXED(_) =>
           REFERENCE(AnyRefClass)
         case _ =>
-          abort("Uncomparbale type kinds: ARRAY with " + other)
+          abort("Uncomparable type kinds: ARRAY with " + other)
       }
 
     /** Checks subtyping relationship. */
@@ -409,7 +419,7 @@ trait TypeKinds { self: ICodes =>
         case REFERENCE(_) =>
           REFERENCE(AnyRefClass)
         case _ =>
-          abort("Uncomparbale type kinds: ConcatClass with " + other)
+          abort("Uncomparable type kinds: ConcatClass with " + other)
       }
 
     /** Checks subtyping relationship. */
@@ -430,13 +440,13 @@ trait TypeKinds { self: ICodes =>
         REFERENCE(sym)
 
     case SingleType(pre, sym) => 
-      (primitiveTypeMap get sym) getOrElse REFERENCE(sym)
+      primitiveTypeMap.getOrElse(sym, REFERENCE(sym))
 
     case ConstantType(value) =>
       toTypeKind(t.underlying)
 
     case TypeRef(_, sym, args) =>
-      (primitiveTypeMap get sym) getOrElse arrayOrClassType(sym, args)
+      primitiveTypeMap.getOrElse(sym, arrayOrClassType(sym, args))
 
     case ClassInfoType(_, _, sym) =>
       primitiveTypeMap get sym match {

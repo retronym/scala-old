@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2006-2009 LAMP/EPFL
+ * Copyright 2006-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -308,7 +308,7 @@ abstract class MergedClassPath[T] extends ClassPath[T] {
   def sourcepaths: List[AbstractFile] = entries.flatMap(_.sourcepaths)
 
   private def addPackage(to: ClassPath[T], pkg: ClassPath[T]) = to match {
-    case cp: MergedClassPath[T] =>
+    case cp: MergedClassPath[_] =>
       newMergedClassPath(cp.entries ::: List(pkg))
     case _ =>
       newMergedClassPath(List(to, pkg))

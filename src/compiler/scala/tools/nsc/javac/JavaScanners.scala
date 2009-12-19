@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -7,7 +7,7 @@ package scala.tools.nsc
 package javac
 
 import scala.tools.nsc.util._
-import SourceFile.{LF, FF, CR, SU}
+import Chars.{LF, FF, CR, SU}
 import JavaTokens._
 import scala.annotation.switch
 
@@ -836,7 +836,7 @@ trait JavaScanners {
         var value: Long = 0
         val divider = if (base == 10) 1 else 2
         val limit: Long =
-          if (token == LONGLIT) Math.MAX_LONG else Math.MAX_INT
+          if (token == LONGLIT) Long.MaxValue else Int.MaxValue
         var i = 0
         val len = name.length
         while (i < len) {
@@ -864,7 +864,7 @@ trait JavaScanners {
     */
     def floatVal(negated: Boolean): Double = {
       val limit: Double = 
-        if (token == DOUBLELIT) Math.MAX_DOUBLE else Math.MAX_FLOAT
+        if (token == DOUBLELIT) Double.MaxValue else Float.MaxValue
       try {
         val value: Double = java.lang.Double.valueOf(name.toString()).doubleValue()
         if (value > limit)

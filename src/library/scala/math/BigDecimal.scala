@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2007-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2007-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -165,16 +165,21 @@ extends ScalaNumber with ScalaNumericConversions
    *  which deems 2 == 2.00, whereas in java these are unequal
    *  with unequal hashCodes.
    */
-  override def hashCode(): Int = doubleValue.hashCode()
+  override def hashCode(): Int =
+    if (isWhole) unifiedPrimitiveHashcode
+    else doubleValue.hashCode()
 
   /** Compares this BigDecimal with the specified value for equality.
    *  Will only claim equality with scala.BigDecimal and java.math.BigDecimal.
    */
   override def equals (that: Any): Boolean = that match {
-    case that: BigDecimal           => this equals that 
-    case that: BigDec               => this equals BigDecimal(that)
-    case _                          => false
+    case that: BigDecimal => this equals that 
+    case that: BigInt     => this.toBigIntExact exists (that equals _)
+    case x                => unifiedPrimitiveEquals(x)
   }
+  
+  protected[math] def isWhole = (this remainder 1) == BigDecimal(0)
+  def underlying = bigDecimal
 
   /** Compares this BigDecimal with the specified BigDecimal for equality.
    */

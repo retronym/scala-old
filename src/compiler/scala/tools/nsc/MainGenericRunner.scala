@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2006-2009 LAMP/EPFL
+ * Copyright 2006-2010 LAMP/EPFL
  * @author  Lex Spoon
  */
 
@@ -11,9 +11,8 @@ import java.io.{ File, IOException }
 import java.lang.{ClassNotFoundException, NoSuchMethodException}
 import java.lang.reflect.InvocationTargetException
 import java.net.{ URL, MalformedURLException }
-import scala.util.ScalaClassLoader
 
-import util.ClassPath
+import util.{ ClassPath, ScalaClassLoader }
 import File.pathSeparator
 import Properties.{ versionString, copyrightString }
 
@@ -81,7 +80,7 @@ object MainGenericRunner {
       if (b) exitSuccess else exitFailure(null)
 
     def fileToURL(f: File): Option[URL] =
-      try { Some(f.toURL) }
+      try { Some(f.toURI.toURL) }
       catch { case e => Console.println(e); None }
 
     def paths(str: String): List[URL] =

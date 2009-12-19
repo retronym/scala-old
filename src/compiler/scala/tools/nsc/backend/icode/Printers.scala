@@ -1,5 +1,5 @@
 /* NSC -- new scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 
@@ -119,9 +119,9 @@ trait Printers { self: ICodes =>
       print(bb.label)
       if (bb.loopHeader) print("[loop header]")
       print(": ");
-      if (settings.debug.value) print("pred: " + bb.predecessors + " succs: " + bb.successors)
+      if (settings.debug.value) print("pred: " + bb.predecessors + " succs: " + bb.successors + " flags: " + bb.flagsString)
       indent; println
-      bb.toList foreach printInstruction
+      bb foreach printInstruction
       undent; println
     }
 

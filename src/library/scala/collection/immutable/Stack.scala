@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -69,7 +69,6 @@ class Stack[+A] protected (protected val elems: List[A]) extends Seq[A] {
    *
    *  @param   elems      the iterator object.
    *  @return the stack with the new elements on top.
-   *  @deprecated
    */
   def pushAll[B >: A](elems: Iterator[B]): Stack[B] =
     ((this: Stack[B]) /: elems)(_ push _)

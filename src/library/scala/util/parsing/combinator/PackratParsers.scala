@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2006-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2006-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -289,7 +289,7 @@ to update each parser involved in the recursion.
                 //all setupLR does is change the heads of the recursions, so the seed will stay the same
                 recDetect match {case LR(seed, _, _) => seed.asInstanceOf[ParseResult[T]]}
               }
-              case MemoEntry(Right(res: ParseResult[T])) => res
+              case MemoEntry(Right(res: ParseResult[_])) => res.asInstanceOf[ParseResult[T]]
             }
           }
         }
@@ -316,7 +316,7 @@ to update each parser involved in the recursion.
           //we're done with growing, we can remove data from recursion head
           rest.recursionHeads -= rest.pos
           rest.getFromCache(p).get match {
-            case MemoEntry(Right(x: ParseResult[T])) => x
+            case MemoEntry(Right(x: ParseResult[_])) => x.asInstanceOf[ParseResult[T]]
             case _ => throw new Exception("impossible match")
           }
         }

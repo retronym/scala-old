@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Martin Odersky
  */
 // $Id$
@@ -420,13 +420,13 @@ self =>
     */
     def joinComment(trees: => List[Tree]): List[Tree] = {
       val doc = in.flushDoc
-      if ((doc ne null) && doc._1.length > 0) {
+      if ((doc ne null) && doc.raw.length > 0) {
         val ts = trees
         val main = ts.find(_.pos.isOpaqueRange)
         ts map {
           t =>
-            val dd = DocDef(doc._1, t)
-            val pos = doc._2.withEnd(t.pos.endOrPoint)
+            val dd = DocDef(doc, t)
+            val pos = doc.pos.withEnd(t.pos.endOrPoint)
             dd setPos (if (t eq main) pos else pos.makeTransparent) 
         }
       }
@@ -957,7 +957,7 @@ self =>
      */
     def statement(location: Int): Tree = expr(location) // !!! still needed?
 
-    /** Expr       ::= (Bindings | Id | `_')  `=>' Expr
+    /** Expr       ::= (Bindings | [`implicit'] Id | `_')  `=>' Expr
      *               | Expr1
      *  ResultExpr ::= (Bindings | Id `:' CompoundType) `=>' Block
      *               | Expr1
@@ -1057,6 +1057,8 @@ self =>
         atPos(in.skipToken()) { 
           Throw(expr()) 
         }
+      case IMPLICIT =>
+        implicitClosure(in.skipToken(), location)
       case _ =>
         var t = postfixExpr()
         if (in.token == EQUALS) {
@@ -1116,6 +1118,17 @@ self =>
         stripParens(t)
     }
 
+    /** Expr ::= implicit Id => Expr
+     */
+    def implicitClosure(start: Int, location: Int): Tree = {
+      val param0 = convertToParam(atPos(in.offset)(Ident(ident())))
+      val param = treeCopy.ValDef(param0, param0.mods | Flags.IMPLICIT, param0.name, param0.tpt, param0.rhs)
+      atPos(start, in.offset) {
+        accept(ARROW)
+        Function(List(param), if (location != InBlock) expr() else block())
+      }
+    }
+
     /** PostfixExpr   ::= InfixExpr [Id [nl]]
      *  InfixExpr     ::= PrefixExpr
      *                  | InfixExpr Id [nl] InfixExpr
@@ -1159,7 +1172,8 @@ self =>
         atPos(in.offset) {
           val name = unaryOp()
           in.token match {
-            case INTLIT | LONGLIT | FLOATLIT | DOUBLELIT => literal(true)
+            // Don't include double and float here else we lose -0.0
+            case INTLIT | LONGLIT => literal(true)
             case _ => Select(stripParens(simpleExpr()), name)
           }
         }
@@ -1555,9 +1569,9 @@ self =>
      */
     private def normalize(mods: Modifiers): Modifiers = 
       if ((mods hasFlag Flags.PRIVATE) && mods.privateWithin != nme.EMPTY.toTypeName)
-        mods &~ Flags.PRIVATE
+        normalize(mods &~ Flags.PRIVATE)
       else if ((mods hasFlag Flags.ABSTRACT) && (mods hasFlag Flags.OVERRIDE))
-        mods &~ (Flags.ABSTRACT | Flags.OVERRIDE) | Flags.ABSOVERRIDE
+        normalize(mods &~ (Flags.ABSTRACT | Flags.OVERRIDE) | Flags.ABSOVERRIDE)
       else
         mods
 
@@ -2551,12 +2565,15 @@ self =>
     }
     */
 
-    def localDef : List[Tree] = {
+    def localDef(implicitMod: Int): List[Tree] = {
       val annots = annotations(true, false)
       val pos = in.offset
-      val mods = localModifiers() withAnnotations annots
-      if (!(mods hasFlag ~(Flags.IMPLICIT | Flags.LAZY))) defOrDcl(pos, mods)
-      else List(tmplDef(pos, mods))
+      val mods = (localModifiers() | implicitMod) withAnnotations annots
+      val defs = 
+        if (!(mods hasFlag ~(Flags.IMPLICIT | Flags.LAZY))) defOrDcl(pos, mods)
+        else List(tmplDef(pos, mods))
+      if (in.token != RBRACE && in.token != CASE) defs
+      else defs ::: List(Literal(()).setPos(o2p(in.offset)))
     }
 
     /** BlockStatSeq ::= { BlockStat semi } [ResultExpr]
@@ -2575,11 +2592,14 @@ self =>
           stats += statement(InBlock)
           if (in.token != RBRACE && in.token != CASE) acceptStatSep()
         } else if (isDefIntro || isLocalModifier || in.token == AT) {
-          stats ++= localDef
-          if (in.token == RBRACE || in.token == CASE) {
-            //syntaxError("block must end in result expression, not in definition", false)
-            stats += Literal(()).setPos(o2p(in.offset))
-          } else acceptStatSep()
+          if (in.token == IMPLICIT) {
+            val start = in.skipToken()
+            if (isIdent) stats += implicitClosure(start, InBlock)
+            else stats ++= localDef(Flags.IMPLICIT)
+          } else {
+            stats ++= localDef(0)
+          }
+          if (in.token != RBRACE && in.token != CASE) acceptStatSep()
         } else if (isStatSep) {
           in.nextToken()
         } else {

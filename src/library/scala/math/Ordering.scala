@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -27,11 +27,11 @@ import java.util.Comparator
  * <li>reflexive: <code>compare(x, x) == 0</code>, for any <code>x</code> of 
  * type <code>T</code>.</li>
  * <li>symmetry: <code>compare(x, y) == z</code> and <code>compare(y, x) == w</code>
- * then <code>Math.signum(z) == -Math.signum(w)</code>, for any <code>x</code> and <code>y</code> of 
+ * then <code>math.signum(z) == -math.signum(w)</code>, for any <code>x</code> and <code>y</code> of 
  * type <code>T</code> and <code>z</code> and <code>w</code> of type <code>Int</code>.</li>
  * <li>transitive: if <code>compare(x, y) == z</code> and <code>compare(y, w) == v</code> 
- * and <code>Math.signum(z) &gt;= 0</code> and <code>Math.signum(v) &gt;= 0</code> then
- * <code>compare(x, w) == u</code> and <code>Math.signum(z + v) == Math.signum(u)</code>,
+ * and <code>math.signum(z) &gt;= 0</code> and <code>math.signum(v) &gt;= 0</code> then
+ * <code>compare(x, w) == u</code> and <code>math.signum(z + v) == math.signum(u)</code>,
  * for any <code>x</code>, <code>y</code>,
  * and <code>w</code> of type <code>T</code> and <code>z</code>, <code>v</code>, and <code>u</code>
  * of type <code>Int</code>.</li>
@@ -126,6 +126,11 @@ object Ordering extends LowPriorityOrderingImplicits {
   
   def fromLessThan[T](cmp: (T, T) => Boolean): Ordering[T] = new Ordering[T] {
     def compare(x: T, y: T) = if (cmp(x, y)) -1 else if (cmp(y, x)) 1 else 0
+    // overrides to avoid multiple comparisons
+    override def lt(x: T, y: T): Boolean = cmp(x, y)
+    override def gt(x: T, y: T): Boolean = cmp(y, x)
+    override def gteq(x: T, y: T): Boolean = !cmp(x, y)
+    override def lteq(x: T, y: T): Boolean = !cmp(y, x)
   }
   
   trait UnitOrdering extends Ordering[Unit] {

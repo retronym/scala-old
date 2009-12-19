@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2003-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2003-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |    http://scala-lang.org/               **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -62,18 +62,7 @@ class SyncVar[A] {
     isDefined = true
     notifyAll()
   }
-  
-  @deprecated("Will be removed in 2.8. SyncVar should not allow exception by design.")
-  def setWithCatch(x: => A) = synchronized {
-    try {
-      this set x
-    } catch {
-      case e =>
-        this setException e
-        throw e
-    }
-  }
-  
+
   def put(x: A) = synchronized {
     while (isDefined) wait()
     set(x)

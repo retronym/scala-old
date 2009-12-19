@@ -1,5 +1,5 @@
 /* NSC -- new Scala compiler
- * Copyright 2005-2009 LAMP/EPFL
+ * Copyright 2005-2010 LAMP/EPFL
  * @author  Lex Spoon
  */
 
@@ -8,7 +8,7 @@
 package scala.tools.nsc
 
 import java.net.URL
-import scala.util.ScalaClassLoader
+import util.ScalaClassLoader
 
 /** An object that runs another object specified by name.
  *

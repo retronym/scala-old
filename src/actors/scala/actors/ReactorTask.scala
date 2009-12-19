@@ -1,6 +1,6 @@
 /*                     __                                               *\
 **     ________ ___   / /  ___     Scala API                            **
-**    / __/ __// _ | / /  / _ |    (c) 2005-2009, LAMP/EPFL             **
+**    / __/ __// _ | / /  / _ |    (c) 2005-2010, LAMP/EPFL             **
 **  __\ \/ /__/ __ |/ /__/ __ |                                         **
 ** /____/\___/_/ |_/____/_/ | |                                         **
 **                          |/                                          **
@@ -20,7 +20,7 @@ import java.util.concurrent.Callable
  *
  *  @author Philipp Haller
  */
-private[actors] class ReactorTask[T <: Reactor](var reactor: T, var fun: () => Unit)
+private[actors] class ReactorTask[T >: Null <: Reactor](var reactor: T, var fun: () => Unit)
   extends Callable[Unit] with Runnable {
 
   def run() {
