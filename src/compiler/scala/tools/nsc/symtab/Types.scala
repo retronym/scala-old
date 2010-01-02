@@ -139,8 +139,6 @@ trait Types {
     }
   }
 
-
-
   /** A map from lists to compound types that have the given list as parents.
    *  This is used to avoid duplication in the computation of base type sequences and baseClasses.
    *  It makes use of the fact that these two operations depend only on the parents,
@@ -1763,7 +1761,7 @@ A type's typeSymbol should never be inspected directly.
         packagePrefix + str
       else if (sym.isModuleClass)
         objectPrefix + str
-      else if (sym.isAnonymousClass && sym.isInitialized && !settings.debug.value)
+      else if (sym.isAnonymousClass && sym.isInitialized && !settings.debug.value && !phase.erasedTypes)
         thisInfo.parents.mkString(" with ") + {
           if (sym.isStructuralRefinement)
             ((decls.toList filter { entry =>
@@ -1942,7 +1940,7 @@ A type's typeSymbol should never be inspected directly.
     }
 
     private def wildcardArgsString(available: Set[Symbol], args: List[Type]): List[String] = args match {
-      case TypeRef(_, sym, _) :: args1 if (quantified contains sym) =>
+      case TypeRef(_, sym, _) :: args1 if (available contains sym) =>
         ("_"+sym.infoString(sym.info)) :: wildcardArgsString(available - sym, args1)
       case arg :: args1 if !(quantified exists (arg contains _)) =>
         arg.toString :: wildcardArgsString(available, args1) 
@@ -2314,7 +2312,9 @@ A type's typeSymbol should never be inspected directly.
 
   /** The canonical creator for this-types */
   def mkThisType(sym: Symbol): Type = {
-    if (phase.erasedTypes) sym.tpe else unique(new ThisType(sym) with UniqueType)
+    if (!phase.erasedTypes) unique(new ThisType(sym) with UniqueType)
+    else if (sym.isImplClass) sym.typeOfThis
+    else sym.tpe
   }
 
   /** The canonical creator for single-types */
@@ -4033,6 +4033,7 @@ A type's typeSymbol should never be inspected directly.
   /** Does type `tp1' conform to `tp2'?
    */
   private def isSubType2(tp1: Type, tp2: Type, depth: Int): Boolean = {
+    if (tp1 eq tp2) return true
     if (isErrorOrWildcard(tp1)) return true
     if (isErrorOrWildcard(tp2)) return true
     if (tp1 eq NoType) return false
@@ -4350,6 +4351,8 @@ A type's typeSymbol should never be inspected directly.
           }
         }
         tvar.constr.inst = NoType // necessary because hibounds/lobounds may contain tvar
+
+        //println("solving "+tvar+" "+up+" "+(if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds)+((if (up) (tvar.constr.hiBounds) else tvar.constr.loBounds) map (_.widen)))
 
         tvar setInst (
           if (up) {

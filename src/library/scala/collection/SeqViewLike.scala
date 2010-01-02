@@ -23,13 +23,14 @@ import TraversableView.NoBuilder
 trait SeqViewLike[+A, 
                            +Coll,
                            +This <: SeqView[A, Coll] with SeqViewLike[A, Coll, This]] 
-  extends Seq[A] with SeqLike[A, This] with IterableView[A, Coll] with IterableViewLike[A, Coll, This] 
+  extends Seq[A]
+      with SeqLike[A, This]
+      with IterableView[A, Coll]
+      with IterableViewLike[A, Coll, This] 
+      with views.SeqTransformations[A, Coll, This]
 { self =>
 
-  trait Transformed[+B] extends SeqView[B, Coll] with super.Transformed[B] {
-    override def length: Int
-    override def apply(idx: Int): B
-  }
+  trait Transformed[+B] extends views.SeqLike[B, Coll] with super.Transformed[B]
 
   trait Sliced extends Transformed[A] with super.Sliced {
     override def length = ((until min self.length) - from) max 0
@@ -117,10 +118,16 @@ trait SeqViewLike[+A,
   }
   
   trait Reversed extends Transformed[A] {
-    override def iterator: Iterator[A] = self.reverseIterator 
+    override def iterator: Iterator[A] = createReversedIterator
     override def length: Int = self.length
     override def apply(idx: Int): A = self.apply(length - 1 - idx)
     override def stringPrefix = self.stringPrefix+"R"
+    
+    private def createReversedIterator = {
+      var lst = List[A]()
+      for (elem <- self) lst ::= elem
+      lst.iterator
+    }
   }
 
   trait Patched[B >: A] extends Transformed[B] {
@@ -137,21 +144,6 @@ trait SeqViewLike[+A,
     override def stringPrefix = self.stringPrefix+"P"
   }
 
-  /** Boilerplate method, to override in each subclass
-   *  This method could be eliminated if Scala had virtual classes
-   */
-  protected override def newAppended[B >: A](that: Traversable[B]): Transformed[B] = new Appended[B] { val rest = that }
-  protected override def newMapped[B](f: A => B): Transformed[B] = new Mapped[B] { val mapping = f }
-  protected override def newFlatMapped[B](f: A => Traversable[B]): Transformed[B] = new FlatMapped[B] { val mapping = f }
-  protected override def newFiltered(p: A => Boolean): Transformed[A] = new Filtered { val pred = p }
-  protected override def newSliced(_from: Int, _until: Int): Transformed[A] = new Sliced { val from = _from; val until = _until }
-  protected override def newDroppedWhile(p: A => Boolean): Transformed[A] = new DroppedWhile { val pred = p }
-  protected override def newTakenWhile(p: A => Boolean): Transformed[A] = new TakenWhile { val pred = p }
-  protected override def newZipped[B](that: Iterable[B]): Transformed[(A, B)] = new Zipped[B] { val other = that }
-  protected override def newZippedAll[A1 >: A, B](that: Iterable[B], _thisElem: A1, _thatElem: B): Transformed[(A1, B)] = new ZippedAll[A1, B] { val other = that; val thisElem = _thisElem; val thatElem = _thatElem }
-  protected def newReversed: Transformed[A] = new Reversed { }
-  protected def newPatched[B >: A](_from: Int, _patch: Seq[B], _replaced: Int): Transformed[B] = new Patched[B] { val from = _from; val patch = _patch; val replaced = _replaced }
-
   override def reverse: This = newReversed.asInstanceOf[This]
 
   override def patch[B >: A, That](from: Int, patch: Seq[B], replaced: Int)(implicit bf: CanBuildFrom[This, B, That]): That = {
@@ -165,6 +157,9 @@ trait SeqViewLike[+A,
 
   override def padTo[B >: A, That](len: Int, elem: B)(implicit bf: CanBuildFrom[This, B, That]): That =
     patch(length, fill(len - length)(elem), 0)
+    
+  override def reverseMap[B, That](f: A => B)(implicit bf: CanBuildFrom[This, B, That]): That =
+    reverse.map(f)
 
   override def stringPrefix = "SeqView"
 }

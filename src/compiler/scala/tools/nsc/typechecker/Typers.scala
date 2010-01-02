@@ -545,6 +545,24 @@ trait Typers { self: Analyzer =>
 
     final val xtypes = false
 
+    /** Is symbol defined and not stale?
+     */
+    def reallyExists(sym: Symbol) = {
+      if (isStale(sym)) sym.setInfo(NoType)
+      sym.exists
+    }
+
+    /** A symbol is stale if it is toplevel, to be loaded from a classfile, and
+     *  the classfile is produced from a sourcefile which is compiled in the current run.
+     */
+    def isStale(sym: Symbol): Boolean = {
+      sym.rawInfo.isInstanceOf[loaders.ClassfileLoader] && {
+        sym.rawInfo.load(sym)
+        (sym.sourceFile ne null) &&
+        (currentRun.compiledFiles contains sym.sourceFile)
+      }
+    }
+
     /** Does the context of tree <code>tree</code> require a stable type?
      */
     private def isStableContext(tree: Tree, mode: Int, pt: Type) =  
@@ -895,7 +913,7 @@ trait Typers { self: Analyzer =>
             case _ => TypeTree(tree.tpe) setOriginal(tree)
           }
         } else if ((mode & (PATTERNmode | FUNmode)) == (PATTERNmode | FUNmode)) { // (5)
-          val extractor = tree.symbol.filter(sym => unapplyMember(sym.tpe).exists)
+          val extractor = tree.symbol.filter(sym => reallyExists(unapplyMember(sym.tpe)))
           if (extractor != NoSymbol) {
             tree setSymbol extractor
             val unapply = unapplyMember(extractor.tpe)
@@ -1655,11 +1673,11 @@ trait Typers { self: Analyzer =>
       while (cx != NoContext) {
         val pre = cx.enclClass.prefix
         val defEntry = cx.scope.lookupEntry(name)
-        if ((defEntry ne null) && defEntry.sym.exists)
+        if ((defEntry ne null) && reallyExists(defEntry.sym))
           return Some(defEntry.sym)
         
         cx = cx.enclClass
-        (pre member name filter (sym => sym.exists && context.isAccessible(sym, pre, false))) match {
+        (pre member name filter (sym => reallyExists(sym) && context.isAccessible(sym, pre, false))) match {
           case NoSymbol   => cx = cx.outer
           case other      => return Some(other)
         }
@@ -2474,9 +2492,17 @@ trait Typers { self: Analyzer =>
             }
             val (unappFormal, freeVars) = freshArgType(unappType)
             val context1 = context.makeNewScope(context.tree, context.owner)
-            freeVars foreach(sym => context1.scope.enter(sym))
+            freeVars foreach context1.scope.enter
             val typer1 = newTyper(context1)
-            arg.tpe = typer1.infer.inferTypedPattern(tree.pos, unappFormal, arg.tpe)
+            val pattp = typer1.infer.inferTypedPattern(tree.pos, unappFormal, arg.tpe)
+            // turn any unresolved type variables in freevars into existential skolems
+            val skolems = freeVars map { fv =>
+              val skolem = new TypeSkolem(context1.owner, fun.pos, fv.name, fv)
+              skolem.setInfo(fv.info.cloneInfo(skolem))
+                .setFlag(fv.flags | EXISTENTIAL).resetFlag(PARAM)
+              skolem
+            }
+            arg.tpe = pattp.substSym(freeVars, skolems)
             //todo: replace arg with arg.asInstanceOf[inferTypedPattern(unappFormal, arg.tpe)] instead.
             argDummy.setInfo(arg.tpe) // bq: this line fixed #1281. w.r.t. comment ^^^, maybe good enough?
           }
@@ -2523,25 +2549,10 @@ trait Typers { self: Analyzer =>
             if (formals1.length == args.length) {
               val args1 = typedArgs(args, mode, formals0, formals1)
               if (!isFullyDefined(pt)) assert(false, tree+" ==> "+UnApply(fun1, args1)+", pt = "+pt)
-              // <pending-change>
-              //   this would be a better choice (from #1196), but fails due to (broken?) refinements
               val itype =  glb(List(pt, arg.tpe))
-              // </pending-change>
               // restore old type (arg is a dummy tree, just needs to pass typechecking)
               arg.tpe = oldArgType
-              UnApply(fun1, args1) setPos tree.pos setType itype //pt
-              //
-              // if you use the better itype, then the following happens.
-              // the required type looks wrong...
-              // 
-              ///files/pos/bug0646.scala                                [FAILED]
-              //
-              //failed with type mismatch;
-              // found   : scala.xml.NodeSeq{ ... }
-              // required: scala.xml.NodeSeq{ ... } with scala.xml.NodeSeq{ ... } with scala.xml.Node on: temp3._data().==("Blabla").&&({
-              //  exit(temp0);
-              //  true
-              //})
+              UnApply(fun1, args1) setPos tree.pos setType itype
             } else {
               errorTree(tree, "wrong number of arguments for "+treeSymTypeMsg(fun))
             }
@@ -3474,7 +3485,7 @@ trait Typers { self: Analyzer =>
           val qual1 = adaptToName(qual, name)
           if (qual1 ne qual) return typed(treeCopy.Select(tree, qual1, name), mode, pt)
         }
-        if (!sym.exists) {
+        if (!reallyExists(sym)) {
           if (settings.debug.value) Console.err.println("qual = "+qual+":"+qual.tpe+"\nSymbol="+qual.tpe.termSymbol+"\nsymbol-info = "+qual.tpe.termSymbol.info+"\nscope-id = "+qual.tpe.termSymbol.info.decls.hashCode()+"\nmembers = "+qual.tpe.members+"\nname = "+name+"\nfound = "+sym+"\nowner = "+context.enclClass.owner)
           if (!qual.tpe.widen.isErroneous) {
             error(tree.pos,
@@ -3541,12 +3552,15 @@ trait Typers { self: Analyzer =>
         var pre: Type = NoPrefix         // the prefix type of defSym, if a class member
         var qual: Tree = EmptyTree       // the qualififier tree if transformed tree is a select
 
-        // if we are in a constructor of a pattern, ignore all definitions
+        // A symbol qualifies if it exists and is not stale. Stale symbols
+        // are made to disappear here. In addition,
+        // if we are in a constructor of a pattern, we ignore all definitions
         // which are methods (note: if we don't do that
         // case x :: xs in class List would return the :: method).
-        def qualifies(sym: Symbol): Boolean = 
-          sym.exists && 
+        def qualifies(sym: Symbol): Boolean = {
+          reallyExists(sym) &&
           ((mode & PATTERNmode | FUNmode) != (PATTERNmode | FUNmode) || !sym.isSourceMethod)
+        }
            
         if (defSym == NoSymbol) {
           var defEntry: ScopeEntry = null // the scope entry of defSym, if defined in a local scope
@@ -3576,7 +3590,7 @@ trait Typers { self: Analyzer =>
                          else cx.depth - (cx.scope.nestingLevel - defEntry.owner.nestingLevel)
           var impSym: Symbol = NoSymbol;      // the imported symbol
           var imports = context.imports;      // impSym != NoSymbol => it is imported from imports.head
-          while (!impSym.exists && !imports.isEmpty && imports.head.depth > symDepth) {
+          while (!reallyExists(impSym) && !imports.isEmpty && imports.head.depth > symDepth) {
             impSym = imports.head.importedSymbol(name)
             if (!impSym.exists) imports = imports.tail
           }
@@ -3618,7 +3632,7 @@ trait Typers { self: Analyzer =>
                      (!imports.head.isExplicitImport(name) ||
                       imports1.head.depth == imports.head.depth)) {
                 var impSym1 = imports1.head.importedSymbol(name)
-                if (impSym1.exists) {
+                if (reallyExists(impSym1)) {
                   if (imports1.head.isExplicitImport(name)) {
                     if (imports.head.isExplicitImport(name) ||
                         imports1.head.depth != imports.head.depth) ambiguousImport()

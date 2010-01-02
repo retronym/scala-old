@@ -158,7 +158,7 @@ abstract class TailCalls extends Transform
           val newCtx = mkContext(ctx)
           newCtx.currentMethod = tree.symbol
           newCtx.makeLabel()
-          val currentClassParam = tree.symbol.newSyntheticValueParam(currentClass.tpe)
+          val currentClassParam = tree.symbol.newSyntheticValueParam(currentClass.typeOfThis)
           newCtx.label.setInfo(MethodType(currentClassParam :: tree.symbol.tpe.params, tree.symbol.tpe.finalResultType))
           newCtx.tailPos = true
 
@@ -193,7 +193,7 @@ abstract class TailCalls extends Transform
                 isTransformed = true
                 val newThis = newCtx.currentMethod
                   . newValue (tree.pos, nme.THIS)
-                  . setInfo (currentClass.tpe)
+                  . setInfo (currentClass.typeOfThis)
                   . setFlag (Flags.SYNTHETIC)
                 
                 typed(atPos(tree.pos)(Block(

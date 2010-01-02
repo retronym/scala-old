@@ -67,18 +67,18 @@ object TestNumericWidening {
   val x: java.lang.Long = y
 }
 
-// #2709
-package foo2709 {
-  class A
-  class B
-
-  package object bar {
-    implicit def a2b(a: A): B = new B
-  }
-
-  package bar {
-    object test {
-      new A: B
-    }
-  }
-}
+// #2709 
+package foo2709 { 
+  class A 
+  class B 
+ 
+  package object bar { 
+    implicit def a2b(a: A): B = new B 
+  } 
+ 
+  package bar { 
+    object test { 
+      new A: B 
+    } 
+  } 
+} 
