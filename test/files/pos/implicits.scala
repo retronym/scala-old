@@ -82,3 +82,18 @@ package foo2709 {
     } 
   } 
 } 
+
+object AliasCompanionSearch {
+  trait B[Y[_]]
+
+  trait A[X]
+
+  object A {
+    implicit val a: B[A] = new B[A] {}
+  }
+
+  type AA[X] = A[X]
+
+  implicitly[B[A]] // works okay
+  implicitly[B[AA]] // failing as at 05.01.2010
+}
