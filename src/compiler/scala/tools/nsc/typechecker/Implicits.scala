@@ -739,7 +739,7 @@ self: Analyzer =>
                     args foreach getParts
                 }
             } else if (sym.isAliasType) {
-              getParts(tp.dealias)
+              getParts(tp.normalize)
             } else if (sym.isAbstractType) {
               getParts(tp.bounds.hi)
             }
